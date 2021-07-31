@@ -3,7 +3,9 @@
 # @email 119020045@link.cuhk.edu.cn
 # @create date 2021-07-25 16:18:29
 # @modify date 2021-07-25 16:18:30
-# @desc [description]
+# @desc [Original version
+#       Objective function: KL(P||Q) + lambda * tr(v'Hv) + rho/2 * ||H-L||_F^2;
+#       Q: t-sne Q]
 
 
 import numpy as np
@@ -178,15 +180,32 @@ def expand(X,n,d=2):
     n1 = X.shape[1]
     return np.tile(X.reshape(n0,n1,1,1),(n,d))
 
+def reform(X, d):
+    assert X.shape[0] == X.shape[1]
+    n = X.shape[0]
+    A = list()
+    for i in range(n):
+        zeros = np.zeros_like(X)
+        zeros[i,:] = np.ones_like(zeros[i,:])
+        zeros[:,i] = - np.ones_like(zeros[:,i])
+        A.append((zeros * X).reshape(-1,d))
+    A = np.array(A).transpose(1,0,2)
+    A = A.reshape(n,n,n,d)
+    return A
+
 def cal_gy_Q(Q, Y, inv_distances):
     n, d = Y.shape[0], Y.shape[1]
     Y_ = np.tile(Y.reshape(n,1,d),(n,1))
     Y_2 = np.tile(Y,(n,1)).reshape(n,n,d)
     diff_Y = Y_ - Y_2
-    gy_Q = (expand(Q * inv_distances, 1, d) * diff_Y.reshape(n,n,1,d)).sum(axis = 1)
-    gy_Q = np.kron(Q.reshape(n,n,1),gy_Q.reshape(n,d)).reshape(n,n,n,d)
+    # numerator part
+    inv_dis_Y = expand(inv_distances,1,d).reshape(n,n,d) * diff_Y
+    gy_Q = - reform(inv_dis_Y, d)
 
-    #inv_distances * (diff_Y)
+    # demoninator part
+    gy_Q2 = (expand(Q * inv_distances, 1, d) * diff_Y.reshape(n,n,1,d)).sum(axis = 1)
+    gy_Q = gy_Q2 + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
+
     return gy_Q
 
 def power_diag(D,power):
@@ -204,8 +223,8 @@ def eigen_grad(H, Q, Y, inv_distances, beta, rho, num_eigen):
     U0 = -0.5 * power_diag(D,-1.5) @ Q @ power_diag(D,-0.5)
     U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
     ones = np.ones((n,1))
-    U0_ = expand((U0 @ ones * (H-L) @ ones) @ ones.T, n, d) * gy_Q
-    U1_ = expand(ones @ ((ones.T @ U0) * (ones.T @ (H-L))), n, d) * gy_Q
+    U0_ = expand(((U0 * (H-L)) @ ones) @ ones.T, n, d) * gy_Q
+    U1_ = expand(ones @ (ones.T @ (U0 * (H-L))), n, d) * gy_Q
     D_ =  expand((H-L) * power_diag(D, -1), n, d) * gy_Q
     grad_Y = sum(sum(U0_ + U1_ + D_))
 
@@ -217,6 +236,7 @@ def eigen_grad(H, Q, Y, inv_distances, beta, rho, num_eigen):
     print(lam[:5])
 
     return grad_Y, grad_H
+
 
 def tsne_grad(P, Q, Y, inv_distances, H, beta, rho, num_eigen):
     """
@@ -236,15 +256,13 @@ def tsne_grad(P, Q, Y, inv_distances, H, beta, rho, num_eigen):
     if beta != 0:
         grad_Y2, grad_H = eigen_grad(H, Q, Y, inv_distances, beta, rho, num_eigen)
         grad_Y = 4. * (pq_expanded * y_diffs_wt).sum(1) + rho * grad_Y2
+
     else:
         grad_Y = 4. * (pq_expanded * y_diffs_wt).sum(1)
         grad_H = None
 
     print('-------gradient of Y -------')
     print(grad_Y[0])
-
-    #print('-------gradient of H -------')
-    #print(grad_H[0])
 
     return grad_Y, grad_H
 
@@ -294,7 +312,7 @@ def init_y(sample_num, sigma, low_dim = 2, random_state = 0):
 
     return y0
 
-def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rate2,momentum, beta, rho, num_eigen, plot):
+def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rate2,momentum, beta, rho, num_eigen, plot, exa_stage, lst_stage):
     """Estimates a SNE model.
 
     # Arguments
@@ -316,8 +334,8 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rat
     # Initialise our 2D H = Initial Laplacian Matrix
     Q, distances = q_fn(Y)
     n, d = Y.shape[0], Y.shape[1]
-    D = np.diag(Q.sum(axis = 0))
-    L = np.eye(n) - power_diag(D,-0.5) @ Q @ power_diag(D,-0.5)
+    D = np.diag(Q.sum(axis=0))
+    L = np.eye(n) - power_diag(D, -0.5) @ Q @ power_diag(D, -0.5)
     H = L
 
     # Initialise past values (used for momentum)
@@ -331,13 +349,32 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rat
     # Start gradient descent loop
     for i in tqdm(range(num_iters)):
 
+        if i < exa_stage:
+            P2 = 4 * P
+        else:
+            P2 = P
+
+        if i < num_iters - lst_stage:
+            beta2 = 0
+            print('beta = 0')
+        elif i == (num_iters - lst_stage):
+            beta2 = beta
+            D = np.diag(Q.sum(axis=0))
+            L = np.eye(n) - power_diag(D, -0.5) @ Q @ power_diag(D, -0.5)
+            H = L
+            print('beta =',beta)
+        else:
+            beta2 = beta
+            print('beta =', beta)
+
+
         # Estimate gradients with respect to Y
-        grads_Y, grads_H = grad_fn(P, Q, Y, distances, H, beta, rho, num_eigen)
+        grads_Y, grads_H = grad_fn(P2, Q, Y, distances, H, beta2, rho, num_eigen)
 
         # Update Y
         Y = Y - learning_rate1 * grads_Y
         # Update H
-        if beta !=0: H = H - learning_rate2 * grads_H
+        if beta2 !=0: H = H - learning_rate2 * grads_H
         # Get new Q and distances (distances only used for t-SNE)
         Q, distances = q_fn(Y)
 
@@ -346,7 +383,7 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rat
             # Update previous Y's for momentum
             Y_m2 = Y_m1.copy()
             Y_m1 = Y.copy()
-            if beta != 0:
+            if beta2 != 0:
                 H += momentum * (H_m1 - H_m2)
                 H_m2 = H_m1.copy()
                 H_m1 = H.copy()
@@ -354,45 +391,8 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rat
         if plot and i % (num_iters / plot) == 0:
             categorical_scatter_2d(Y, y, alpha=1.0, ms=6,
                                    show=True, figsize=(9, 6))
+
+    categorical_scatter_2d(Y, y, alpha=1.0, ms=6,
+                           show=True, figsize=(9, 6))
     return Y
 
-
-# def main(X, y):
-#     # Obtain matrix of joint probabilities p_ij
-#     P = p_joint(X, PERPLEXITY)
-#
-#     # Fit SNE or t-SNE
-#     Y = estimate_sne(X, y, P,
-#                      num_iters=NUM_ITERS,
-#                      q_fn=q_tsne if TSNE else q_joint,
-#                      grad_fn=tsne_grad if TSNE_grad else yy_grad,
-#                      learning_rate1=LEARNING_RATE[0],
-#                      learning_rate2=LEARNING_RATE[1],
-#                      momentum=MOMENTUM,
-#                      beta=BETA,
-#                      rho=RHO,
-#                      num_eigen = NUM_EIGEN
-#                      plot=NUM_PLOTS)
-#
-#     return Y
-
-# #data = load_breast_cancer()
-# data = load_wine()
-# X = data['data']
-# y = data['target']
-#
-# PERPLEXITY = 30
-# SEED = 1                    # Random seed
-# MOMENTUM = 0.8
-# # LEARNING_RATE = (1e2, 0)
-# # BETA = 0
-# # RHO = 0
-# LEARNING_RATE = (1e2, 0)
-# BETA = 0
-# RHO = 0
-# NUM_ITERS = 100
-# TSNE = True
-# TSNE_grad = True
-# NUM_PLOTS = 5
-#
-# y_tSNE = main(X,y)
