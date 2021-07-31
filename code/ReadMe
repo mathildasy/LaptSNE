@@ -1,0 +1,2 @@
+t-SNE.py and test.py are base files 
+model_GK changes "Q" in derving the Laplacian matrix to Gaussian Kernel similarity. 
