@@ -185,10 +185,14 @@ def cal_gy_Q(Q, Y, inv_distances):
     Y_ = np.tile(Y.reshape(n,1,d),(n,1))
     Y_2 = np.tile(Y,(n,1)).reshape(n,n,d)
     diff_Y = Y_ - Y_2
-    gy_Q = (expand(Q * inv_distances, 1, d) * diff_Y.reshape(n,n,1,d)).sum(axis = 1)
-    gy_Q = np.kron(Q.reshape(n,n,1),gy_Q.reshape(n,d)).reshape(n,n,n,d)
+    # numerator part
+    inv_dis_Y = expand(inv_distances,1,d).reshape(n,n,d) * diff_Y
+    gy_Q = - reform(inv_dis_Y, d)
 
-    #inv_distances * (diff_Y)
+    # demoninator part
+    gy_Q2 = (expand(Q * inv_distances, 1, d) * diff_Y.reshape(n,n,1,d)).sum(axis = 1)
+    gy_Q += gy_Q2 + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
+
     return gy_Q
 
 def power_diag(D,power):

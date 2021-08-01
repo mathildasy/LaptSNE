@@ -204,7 +204,7 @@ def cal_gy_Q(Q, Y, inv_distances):
 
     # demoninator part
     gy_Q2 = (expand(Q * inv_distances, 1, d) * diff_Y.reshape(n,n,1,d)).sum(axis = 1)
-    gy_Q = gy_Q2 + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
+    gy_Q += gy_Q2 + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
 
     return gy_Q
 
