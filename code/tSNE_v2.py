@@ -180,6 +180,19 @@ def expand(X,n,d=2):
     n1 = X.shape[1]
     return np.tile(X.reshape(n0,n1,1,1),(n,d))
 
+def reform(X, d):
+    assert X.shape[0] == X.shape[1]
+    n = X.shape[0]
+    A = list()
+    for i in range(n):
+        zeros = np.zeros_like(X)
+        zeros[i,:] = np.ones_like(zeros[i,:])
+        zeros[:,i] = - np.ones_like(zeros[:,i])
+        A.append((zeros * X).reshape(-1,d))
+    A = np.array(A).transpose(1,0,2)
+    A = A.reshape(n,n,n,d)
+    return A
+
 def cal_gy_Q(Q, Y, inv_distances):
     n, d = Y.shape[0], Y.shape[1]
     Y_ = np.tile(Y.reshape(n,1,d),(n,1))
