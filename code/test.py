@@ -11,8 +11,7 @@ Notes:
 
 """
 
-#import tSNE as ts
-import tSNE_v2 as ts
+import tSNE as ts
 from sklearn import datasets
 
 PERPLEXITY = 20
@@ -26,10 +25,10 @@ NUM_EIGEN = 10
 
 # revised
 LEARNING_RATE = (1e2, 1e0)
-BETA = 1e-1
-RHO = 1e-1
-EXAGGERATE_STAGE = 20
-LAST_STAGE = 10
+BETA = 1e-4
+RHO = 1e-4
+EXAGGERATE_STAGE = 10
+LAST_STAGE = 5
 
 # EXAGGERATE_STAGE = 0
 # LAST_STAGE = 0

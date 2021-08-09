@@ -4,7 +4,7 @@
 # @create date 2021-07-25 16:18:29
 # @modify date 2021-07-25 16:18:30
 # @desc [Original version
-#       Objective function: KL(P||Q) + lambda * tr(v'Hv) + rho/2 * ||H-L||_F^2;
+#       Objective function: KL(P||Q) + beta * tr(v'Hv) + rho/2 * ||H-L||_F^2;
 #       Q: t-sne Q]
 
 
@@ -44,7 +44,6 @@ def categorical_scatter_2d(X2D, class_idxs, ms=3, ax=None, alpha=0.1, legend=Tru
 
 ################  definitions: ################
 def perplexity(distances, sigmas):
-
     """Wrapper function for quick calculation of
     perplexity over a distance matrix."""
     return calc_perplexity(calc_prob_matrix(distances, sigmas))
@@ -195,16 +194,15 @@ def reform(X, d):
 
 def cal_gy_Q(Q, Y, inv_distances):
     n, d = Y.shape[0], Y.shape[1]
-    Y_ = np.tile(Y.reshape(n,1,d),(n,1))
-    Y_2 = np.tile(Y,(n,1)).reshape(n,n,d)
-    diff_Y = Y_ - Y_2
+    diff_Y = np.expand_dims(Y, 1) - np.expand_dims(Y, 0)
+
     # numerator part
-    inv_dis_Y = expand(inv_distances,1,d).reshape(n,n,d) * diff_Y
+    inv_dis_Y = np.expand_dims(inv_distances,2).repeat(d,axis=2) * diff_Y
     gy_Q = - reform(inv_dis_Y, d)
 
     # demoninator part
     gy_Q2 = (expand(Q * inv_distances, 1, d) * diff_Y.reshape(n,n,1,d)).sum(axis = 1)
-    gy_Q += gy_Q2 + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
+    gy_Q = gy_Q + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
 
     return gy_Q
 
@@ -224,11 +222,14 @@ def eigen_grad(H, Q, Y, inv_distances, beta, rho, num_eigen):
     U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
     ones = np.ones((n,1))
     U0_ = expand(((U0 * (H-L)) @ ones) @ ones.T, n, d) * gy_Q
-    U1_ = expand(ones @ (ones.T @ (U0 * (H-L))), n, d) * gy_Q
+    U1_ = expand(ones @ (ones.T @ (U1 * (H-L))), n, d) * gy_Q
     D_ =  expand((H-L) * power_diag(D, -1), n, d) * gy_Q
     grad_Y = sum(sum(U0_ + U1_ + D_))
 
     lam, eig_V = np.linalg.eig(L)
+    idx = np.argsort(lam)
+    lam = lam[idx]
+    eig_V = eig_V[:, idx]
     eig_V = eig_V[:,:num_eigen]
     grad_H = beta * eig_V @ eig_V.T + rho * (H - L)
 
@@ -363,6 +364,7 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rat
             L = np.eye(n) - power_diag(D, -0.5) @ Q @ power_diag(D, -0.5)
             H = L
             print('beta =',beta)
+
         else:
             beta2 = beta
             print('beta =', beta)
@@ -387,6 +389,8 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rat
                 H += momentum * (H_m1 - H_m2)
                 H_m2 = H_m1.copy()
                 H_m1 = H.copy()
+                categorical_scatter_2d(Y, y, alpha=1.0, ms=6,
+                                       show=True, figsize=(9, 6))
 
         if plot and i % (num_iters / plot) == 0:
             categorical_scatter_2d(Y, y, alpha=1.0, ms=6,
