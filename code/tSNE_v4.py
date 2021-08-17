@@ -184,7 +184,7 @@ def power_diag(D,power):
     D_new = np.diag(np.power(np.diag(D),power))
     return D_new
 
-def gk_grad(Y,num_eigen, sigmas, UPDATE_SIGMA = True):
+def gk_grad(Y,num_eigen, sigmas, UPDATE_SIGMA = True, min_k = False):
     '''
     calculate extra part of gradient w.r.t. Y:
     '''
@@ -213,9 +213,15 @@ def gk_grad(Y,num_eigen, sigmas, UPDATE_SIGMA = True):
     n, d = Y.shape[0], Y.shape[1]
     print(n - num_eigen)
     D = np.diag(Kval.sum(axis = 0))
-    lam, eig_V = eigh(power_diag(D,-0.5) @ Kval @ power_diag(D,-0.5), subset_by_index=[n - num_eigen - 1, n - 1])
-    eig_V_kp1 = eig_V[:,-1]
-    eig_V = eig_V[:,:-1]
+    if min_k:
+        lam, eig_V = eigh(power_diag(D,-0.5) @ Kval @ power_diag(D,-0.5), subset_by_index=[n - num_eigen - 1, n - num_eigen])
+        eig_V_kp1 = eig_V[:, 0]
+        eig_V = eig_V[:, 1]
+    else:
+        print("haha")
+        lam, eig_V = eigh(power_diag(D,-0.5) @ Kval @ power_diag(D,-0.5), subset_by_index=[n - num_eigen - 1, n - 1])
+        eig_V_kp1 = eig_V[:,0]
+        eig_V = eig_V[:,1:]
     U0 = -0.5 * power_diag(D,-1.5) @ Kval @ power_diag(D,-0.5)
     U1 = -0.5 * power_diag(D,-0.5) @ Kval @ power_diag(D,-1.5)
     grad_LK = (U0 + U1 + power_diag(D, -1)) * (eig_V @ eig_V.T)
@@ -235,7 +241,7 @@ def gk_grad(Y,num_eigen, sigmas, UPDATE_SIGMA = True):
     return grad_Y, grad_Y3, grad_sigma
 
 
-def tsne_grad(P, Q, Y,  inv_distances, beta, beta_2, num_eigen,sigmas, UPDATE_SIGMA = True):
+def tsne_grad(P, Q, Y,  inv_distances, beta, beta_2, num_eigen,sigmas, UPDATE_SIGMA = True, min_k = False):
     """
     Estimate the gradient of t-SNE cost with respect to Y.
     """
@@ -252,7 +258,7 @@ def tsne_grad(P, Q, Y,  inv_distances, beta, beta_2, num_eigen,sigmas, UPDATE_SI
     # Multiply then sum over j's
     grad_sigma = 0
     if beta != 0:
-        grad_Y2, grad_Y3, grad_sigma = gk_grad(Y, num_eigen,sigmas, UPDATE_SIGMA = True)
+        grad_Y2, grad_Y3, grad_sigma = gk_grad(Y, num_eigen,sigmas, UPDATE_SIGMA, min_k = min_k)
         grad_Y = 4. * (pq_expanded * y_diffs_wt).sum(1) + beta * grad_Y2 - beta_2 * grad_Y3
         grad_sigma = beta * grad_sigma
     else:
@@ -281,7 +287,7 @@ def init_y(sample_num, sigma, low_dim = 2, random_state = 0):
 
 
 def estimate_sne(X, y, P, num_iters, q_fn, learning_rate1, learning_rate2, momentum, beta, beta_2, num_eigen, plot,
-                 exa_stage, lst_stage, rdseed, sigmas, exa_ratio):
+                 exa_stage, lst_stage, rdseed, sigmas, exa_ratio, min_k):
     """Estimates a t-SNE model.
     # Arguments
         X: Input data matrix.
@@ -335,7 +341,7 @@ def estimate_sne(X, y, P, num_iters, q_fn, learning_rate1, learning_rate2, momen
         Y_update = Y[choice, :]
         P2 = P2[np.ix_(choice, choice)]
         Q, distances = q_fn(Y_update)
-        grads_Y, grad_sigma = tsne_grad(P2, Q, Y_update, distances, beta2, beta_3, num_eigen, sigmas, UPDATE_SIGMA = False)
+        grads_Y, grad_sigma = tsne_grad(P2, Q, Y_update, distances, beta2, beta_3, num_eigen, sigmas, UPDATE_SIGMA = False, min_k = min_k)
         # Update Y
         Y_update = Y_update - learning_rate1 * grads_Y
         # Update Sigma

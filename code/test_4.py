@@ -12,7 +12,7 @@ Notes:
 """
 
 # import tSNE_min_k_1 as ts
-import  tSNE_max_k_1 as ts
+import  tSNE_v5 as ts
 from sklearn import datasets
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -48,7 +48,7 @@ BETA_2 = 0.5e-2
 NUM_EIGEN = 10
 RDSEED = 1
 SIGMA = 1e0
-
+MINK = 0
 # data = datasets.load_digits()
 # NUM_SAMPLE = 800
 # PERPLEXITY = 30
@@ -82,10 +82,16 @@ Y, lam_list, sigmas_list = ts.estimate_sne(X, y, P,
                      lst_stage=LAST_STAGE,
                      rdseed=RDSEED,
                      sigmas = SIGMA,
-                     exa_ratio = EXA_RATIO)
+                     exa_ratio = EXA_RATIO,
+                     min_k = MINK)
 
-
-lam_df = pd.DataFrame(lam_list, columns= ['eigen value'+str(i+1) for i in range(NUM_EIGEN+1)])
+if MINK:
+    NUM_lam = 2
+elif BETA_2 != 0:
+    NUM_lam = NUM_EIGEN + 1
+else:
+    Num_lam = NUM_EIGEN
+lam_df = pd.DataFrame(lam_list, columns= ['eigen value'+str(i+1) for i in range(NUM_lam)])
 lam_df.plot()
 plt.savefig('lamda.png')
 plt.show()
