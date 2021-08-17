@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns;
 from scipy.spatial import distance as dist
 from tqdm import tqdm
+from scipy.linalg import eigh
 sns.set()
 
 ################ visualization function ################
@@ -221,12 +222,9 @@ def eigen_grad(Q, Y, inv_distances, num_eigen,sigmas):
     gy_Q = cal_gy_Q(Q, Y, inv_distances)
     n, d = Y.shape[0], Y.shape[1]
     D = np.diag(Q.sum(axis = 0))
-    L = np.eye(n) - power_diag(D,-0.5) @ Q @ power_diag(D,-0.5)
-    lam, eig_V = np.linalg.eig(L)
-    idx = np.argsort(lam)
-    lam = lam[idx]
-    eig_V = eig_V[:, idx]
-    eig_V = eig_V[:,:num_eigen]
+    # scipy的方式较快
+    lam, eig_V = eigh(power_diag(D,-0.5) @ Q @ power_diag(D,-0.5), subset_by_index=[n - num_eigen, n - 1])
+
     U0 = -0.5 * power_diag(D,-1.5) @ Q @ power_diag(D,-0.5)
     U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
     ones = np.ones((n,1))
@@ -248,12 +246,15 @@ def gk_grad(Q, Y, inv_distances, num_eigen,sigmas):
     '''
     global lam_list
     def get_K(Y, sigmas):
-        sigma2 = np.mean(sigmas)
+        # sigma2 = np.mean(sigmas)
+        sigma2 = 1e0
         eucdis = cal_euclidean_dis(Y)
         K = np.exp(-0.5 * eucdis / sigma2)
+        K = K - np.eye(Y.shape[0]) # turn the similarity matrix into affinity matrix
         return K, sigma2
 
     def cal_gy_K(gK_L, Y, Kval, sigma2):
+        sigma2 = 1e0
         Y = Y.T
         T = gK_L * Kval;
         C = np.tile(sum(T), (len(Y), 1));
@@ -263,24 +264,21 @@ def gk_grad(Q, Y, inv_distances, num_eigen,sigmas):
     print(' ------------Start gk_grad ---------------')
 
     Kval,sigma2 = get_K(Y,sigmas)
+    Q = Kval #### 这里准备计算 eigenvalue的时候应该是用Kval的，而不是Q
+
     n, d = Y.shape[0], Y.shape[1]
     D = np.diag(Q.sum(axis = 0))
-    L = np.eye(n) - power_diag(D,-0.5) @ Q @ power_diag(D,-0.5)
-    lam, eig_V = np.linalg.eig(L)
-    idx = np.argsort(lam)
-    lam = lam[idx]
-    eig_V = eig_V[:, idx]
-    eig_V = eig_V[:,:num_eigen]
+    lam, eig_V = eigh(power_diag(D,-0.5) @ Q @ power_diag(D,-0.5), subset_by_index=[n - num_eigen, n - 1])
+
     U0 = -0.5 * power_diag(D,-1.5) @ Q @ power_diag(D,-0.5)
     U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
     grad_LK = (U0+U1+power_diag(D, -1)) * (eig_V @ eig_V.T)
-    # grad_LK = (U0 + U1 + power_diag(D, -1))
     grad_Y = cal_gy_K(grad_LK, Y, Kval, sigma2)
 
 
-    print(f'----------- the {num_eigen} smallest eigenvalues ---------')
+    # print(f'----------- the {num_eigen} smallest eigenvalues ---------')
     lam_list.append(lam[:num_eigen])
-    print(lam[:num_eigen])
+    # print(lam[:num_eigen])
     return grad_Y
 
 
@@ -308,35 +306,6 @@ def tsne_grad(P, Q, eigen_fn,Y,  inv_distances, beta, num_eigen,sigmas):
     print(grad_Y[0])
     return grad_Y
 
-def yy_grad(P, Q, Y, distances):
-    """
-    Estimate the gradient of t-SNE cost with respect to Y.
-    """
-
-        #尺度： y'y
-    #    grad = -2 * (P - Q) * P * P @ Y
-        #grad = 2 * np.multiply((P - Q) ,abs(P - np.ones_like(P)/2)) @ Y
-    #     grad = - 2 * np.multiply(np.multiply((P - Q),(P + 0.5 * 1/P)),(P + 0.5 * 1/P)) @ Y
-    #    grad = - 2 * (P - Q) *(P + 0.5 * 1/P) * (P + 0.5 * 1/P) @ Y
-
-        ##改变尺度: (yi - yj)'(yi - yj)
-    #     pq_expanded = np.expand_dims(P - Q, 2)
-    #     y_diffs = np.expand_dims(Y, 1) - np.expand_dims(Y, 0)
-    #     y_diffs_wt = y_diffs * np.power((np.expand_dims(P, 2) + np.expand_dims(P, -1)),2)
-    #     grad = -2. * (pq_expanded * y_diffs_wt).sum(1)
-
-    pq_expanded = np.expand_dims(P - Q, 2) * np.power((np.expand_dims(P, 2) + 0.0009 * np.expand_dims(P, -1)),2)
-    #     pq_expanded = np.expand_dims(P - Q, 2) * np.power(np.expand_dims(P, 2),2)
-
-    y_diffs = np.expand_dims(Y, 1) - np.expand_dims(Y, 0)
-    dij = cal_euclidean_dis(Y)
-    np.fill_diagonal(dij, 1e10)
-    dij = np.tile(np.power(dij,-2),(y_diffs.shape[-1],1,1)).T
-    y_diffs_wt = y_diffs * dij
-    grad = 4. * (pq_expanded * y_diffs_wt).sum(1)
-
-    return grad
-
 ################  embedding algorithms ################
 def init_y(sample_num, sigma, low_dim = 2, random_state = 0):
     '''
@@ -356,9 +325,8 @@ def init_y(sample_num, sigma, low_dim = 2, random_state = 0):
 
 
 def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, eigen_fn, learning_rate1, momentum, beta, num_eigen, plot,
-                 exa_stage, lst_stage, rdseed, sigmas):
+                 exa_stage, lst_stage, rdseed, sigmas, exa_ratio):
     """Estimates a t-SNE model.
-
     # Arguments
         X: Input data matrix.
         P: Matrix of joint probabilities.
@@ -386,11 +354,12 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, eigen_fn, learning_rate1, mo
     # Start gradient descent loop
     for i in tqdm(range(num_iters)):
         if i < exa_stage:
-            P2 = 4 * P
-            # categorical_scatter_2d(Y, y,
-            #                        title=f'Exaggerate Stage (No.{i + 1}; learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
-            #                        alpha=1.0, ms=6,
-            #                        show=True, figsize=(9, 6))
+            P2 = exa_ratio * P
+            # if i < 20:
+            #     categorical_scatter_2d(Y, y,
+            #                            title=f'Exaggerate Stage (No.{i + 1}; learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
+            #                            alpha=1.0, ms=6,
+            #                            show=True, figsize=(9, 6))
         else:
             P2 = P
         if i < num_iters - lst_stage:
@@ -399,10 +368,10 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, eigen_fn, learning_rate1, mo
         else:
             beta2 = beta
             print('beta =', beta)
-            # categorical_scatter_2d(Y, y,
-            #                        title=f'Plus grad_Y2 (No.{i + 1}; learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
-            #                        alpha=1.0, ms=6,
-            #                        show=True, figsize=(9, 6))
+            categorical_scatter_2d(Y, y,
+                                   title=f'Plus grad_Y2 (No.{i + 1}; learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
+                                   alpha=1.0, ms=6,
+                                   show=True, figsize=(9, 6))
         # choose part if Y for update according to rdseed
         choice = np.random.choice(range(Y.shape[0]), size=(Y_update_num,), replace=False)
         Y_update = Y[choice, :]
@@ -427,7 +396,9 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, eigen_fn, learning_rate1, mo
     categorical_scatter_2d(Y, y,
                            title=f'No.{i + 1} (end); learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
                            alpha=1.0, ms=6,
-                           show=True, figsize=(9, 6))
-
+                           show=True, figsize=(9, 6), savename='lst_iter.png')
 
     return Y, lam_list
+
+
+
