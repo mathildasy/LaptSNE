@@ -37,27 +37,27 @@ NUM_PLOTS = 3
 # GK = 1
 # BETA = 1e-2  # change with delta Y
 
-# data = datasets.load_digits()
-# NUM_SAMPLE = 400
-# PERPLEXITY = 25
-# LEARNING_RATE = 1e2  # change with NUM_SAMPLE
-# EXAGGERATE_STAGE = 50  # change with NUM_SAMPLE
-# LAST_STAGE = 5  # change with NUM_SAMPLE
-# GK = 1
-# BETA = 1e0  # change with delta Y
-# NUM_EIGEN = 11
-# RDSEED = 1
-
 data = datasets.load_digits()
-NUM_SAMPLE = 800
-PERPLEXITY = 30
+NUM_SAMPLE = 400
+PERPLEXITY = 25
 LEARNING_RATE = 1e2  # change with NUM_SAMPLE
-EXAGGERATE_STAGE = 50  # change with NUM_SAMPLE（不需要太大）
-LAST_STAGE = 20  # change with NUM_SAMPLE （到底会不会过头呢？）
+EXAGGERATE_STAGE = 50  # change with NUM_SAMPLE
+LAST_STAGE = 5  # change with NUM_SAMPLE
 GK = 1
-BETA = 3e0  # change with delta Y （较为敏感）
-NUM_EIGEN = 12
+BETA = 1e0  # change with delta Y
+NUM_EIGEN = 11
 RDSEED = 1
+
+# data = datasets.load_digits()
+# NUM_SAMPLE = 800
+# PERPLEXITY = 30
+# LEARNING_RATE = 1e2  # change with NUM_SAMPLE
+# EXAGGERATE_STAGE = 50  # change with NUM_SAMPLE（不需要太大）
+# LAST_STAGE = 20  # change with NUM_SAMPLE （到底会不会过头呢？）
+# GK = 1
+# BETA = 3e0  # change with delta Y （较为敏感）
+# NUM_EIGEN = 12
+# RDSEED = 1
 
 print(data['data'].shape)
 X = data['data'][:NUM_SAMPLE]
@@ -89,7 +89,9 @@ print(lam_df.shape)
 
 lam_df = pd.DataFrame(lam_list, columns= ['eigen value'+str(i+1) for i in range(NUM_EIGEN)])
 lam_df.plot()
+plt.savefig('lamda.png')
 plt.show()
+
 
 
 

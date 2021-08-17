@@ -222,9 +222,8 @@ def eigen_grad(Q, Y, inv_distances, num_eigen,sigmas):
     gy_Q = cal_gy_Q(Q, Y, inv_distances)
     n, d = Y.shape[0], Y.shape[1]
     D = np.diag(Q.sum(axis = 0))
-    L = np.eye(n) - power_diag(D,-0.5) @ Q @ power_diag(D,-0.5)
     # scipy的方式较快
-    lam, eig_V = eigh(L, subset_by_index=[0, num_eigen-1])
+    lam, eig_V = eigh(power_diag(D,-0.5) @ Q @ power_diag(D,-0.5), subset_by_index=[n - num_eigen, n - 1])
 
     U0 = -0.5 * power_diag(D,-1.5) @ Q @ power_diag(D,-0.5)
     U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
@@ -269,9 +268,7 @@ def gk_grad(Q, Y, inv_distances, num_eigen,sigmas):
 
     n, d = Y.shape[0], Y.shape[1]
     D = np.diag(Q.sum(axis = 0))
-    L = np.eye(n) - power_diag(D,-0.5) @ Q @ power_diag(D,-0.5)
-    # scipy的方式较快
-    lam, eig_V = eigh(L, subset_by_index=[0, num_eigen-1])
+    lam, eig_V = eigh(power_diag(D,-0.5) @ Q @ power_diag(D,-0.5), subset_by_index=[n - num_eigen, n - 1])
 
     U0 = -0.5 * power_diag(D,-1.5) @ Q @ power_diag(D,-0.5)
     U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
@@ -399,8 +396,7 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, eigen_fn, learning_rate1, mo
     categorical_scatter_2d(Y, y,
                            title=f'No.{i + 1} (end); learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
                            alpha=1.0, ms=6,
-                           show=True, figsize=(9, 6))
-
+                           show=True, figsize=(9, 6), savename='lst_iter.png')
 
     return Y, lam_list
 
