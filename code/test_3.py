@@ -11,7 +11,8 @@ Notes:
 
 """
 
-import tSNE_v3 as ts
+# import tSNE_min_k_1 as ts
+import  tSNE_max_k_1 as ts
 from sklearn import datasets
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -43,7 +44,8 @@ EXAGGERATE_STAGE = 50  # change with NUM_SAMPLE
 LAST_STAGE = 5  # change with NUM_SAMPLE
 GK = 1
 BETA = 1e0  # change with delta Y
-NUM_EIGEN = 12
+BETA_2 = 0.5e-2
+NUM_EIGEN = 10
 RDSEED = 1
 SIGMA = 1e0
 
@@ -73,6 +75,7 @@ Y, lam_list, sigmas_list = ts.estimate_sne(X, y, P,
                      learning_rate2=LEARNING_RATE[1],
                      momentum=MOMENTUM,
                      beta=BETA,
+                     beta_2 = BETA_2,
                      num_eigen=NUM_EIGEN,
                      plot=NUM_PLOTS,
                      exa_stage=EXAGGERATE_STAGE,
@@ -82,7 +85,7 @@ Y, lam_list, sigmas_list = ts.estimate_sne(X, y, P,
                      exa_ratio = EXA_RATIO)
 
 
-lam_df = pd.DataFrame(lam_list, columns= ['eigen value'+str(i+1) for i in range(NUM_EIGEN)])
+lam_df = pd.DataFrame(lam_list, columns= ['eigen value'+str(i+1) for i in range(NUM_EIGEN+1)])
 lam_df.plot()
 plt.savefig('lamda.png')
 plt.show()
