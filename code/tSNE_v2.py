@@ -3,8 +3,8 @@
 # @email 119020045@link.cuhk.edu.cn
 # @create date 2021-07-25 16:18:29
 # @modify date 2021-07-25 16:18:30
-# @desc [Revised version 1:
-#       Objective function: KL(P||Q) + lambda * tr(v'Lv)
+# @desc [Revised version 2:
+#       Objective function: KL(P||Q) + beta * tr(v'Lv)
 #       Q = t-sne Q]
 
 
@@ -13,10 +13,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns;
 from scipy.spatial import distance as dist
 from tqdm import tqdm
+from scipy.linalg import eigh
 sns.set()
 
 ################ visualization function ################
-def categorical_scatter_2d(X2D, class_idxs, ms=3, ax=None, alpha=0.1, legend=True, figsize=None, show=True,  savename=None):
+def categorical_scatter_2d(X2D, class_idxs, title, ms=3, ax=None, alpha=0.1, legend=True, figsize=None, show=True, savename=None):
     ## Plot a 2D matrix with corresponding class labels: each class diff colour
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
@@ -30,6 +31,7 @@ def categorical_scatter_2d(X2D, class_idxs, ms=3, ax=None, alpha=0.1, legend=Tru
         ax.plot(X2D[class_idxs==cls, 0], X2D[class_idxs==cls, 1], marker=mark,
             linestyle='', ms=ms, label=str(cls), alpha=alpha, color=colors[i],
             markeredgecolor='black', markeredgewidth=0.4)
+        ax.title.set_text(title)
     if legend:
         ax.legend()
 
@@ -72,7 +74,7 @@ def cal_euclidean_dis(df):
     output:
             dis - a two dim array, (num of sample, num of sample)
     '''
-    dis = dist.pdist(df,'sqeuclidean')
+    dis = dist.pdist(df,'sqeuclidean') # Computes the squared Euclidean distance
     dis = dist.squareform(dis)
 
     return dis
@@ -146,7 +148,7 @@ def p_joint(X, target_perplexity):
     # Returns:
         P: Matrix with entries p_ij = joint probabilities.
     """
-    # Get the negative euclidian distances matrix for our data
+    # Get the squared euclidian distances matrix for our data
     distances = cal_euclidean_dis(X)
     # Find optimal sigma for each row of this distances matrix
     sigmas = find_optimal_sigmas(- distances, target_perplexity)
@@ -154,7 +156,7 @@ def p_joint(X, target_perplexity):
     p_conditional = calc_prob_matrix(- distances, sigmas)
     # Go from conditional to joint probabilities matrix
     P = p_conditional_to_joint(p_conditional)
-    return P
+    return P, sigmas
 
 def q_tsne(Y):
     """
@@ -180,18 +182,29 @@ def expand(X,n,d=2):
     n1 = X.shape[1]
     return np.tile(X.reshape(n0,n1,1,1),(n,d))
 
+def reform(X, d):
+    assert X.shape[0] == X.shape[1]
+    n = X.shape[0]
+    A = list()
+    for i in range(n):
+        zeros = np.zeros_like(X)
+        zeros[i,:] = np.ones_like(zeros[i,:])
+        zeros[:,i] = - np.ones_like(zeros[:,i])
+        A.append((zeros * X).reshape(-1,d))
+    A = np.array(A).transpose(1,0,2)
+    A = A.reshape(n,n,n,d)
+    return A
+
 def cal_gy_Q(Q, Y, inv_distances):
     n, d = Y.shape[0], Y.shape[1]
-    Y_ = np.tile(Y.reshape(n,1,d),(n,1))
-    Y_2 = np.tile(Y,(n,1)).reshape(n,n,d)
-    diff_Y = Y_ - Y_2
+    diff_Y = np.expand_dims(Y, 1) - np.expand_dims(Y, 0)
     # numerator part
-    inv_dis_Y = expand(inv_distances,1,d).reshape(n,n,d) * diff_Y
+    inv_dis_Y = np.expand_dims(inv_distances,2).repeat(d,axis=2) * diff_Y
     gy_Q = - reform(inv_dis_Y, d)
 
     # demoninator part
     gy_Q2 = (expand(Q * inv_distances, 1, d) * diff_Y.reshape(n,n,1,d)).sum(axis = 1)
-    gy_Q += gy_Q2 + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
+    gy_Q = gy_Q + np.kron(Q.reshape(n,n,1),gy_Q2.reshape(n,d)).reshape(n,n,n,d)
 
     return gy_Q
 
@@ -199,35 +212,77 @@ def power_diag(D,power):
     D_new = np.diag(np.power(np.diag(D),power))
     return D_new
 
-def eigen_grad(Q, Y, inv_distances, beta, rho, num_eigen):
+def eigen_grad(Q, Y, inv_distances, num_eigen,sigmas):
     '''
     calculate extra part of gradient w.r.t. Y:
-
     '''
-    gy_Q = cal_gy_Q(Q, Y, inv_distances)
+    global lam_list
 
+    print(' ------------Start eigen_grad ---------------')
+    gy_Q = cal_gy_Q(Q, Y, inv_distances)
     n, d = Y.shape[0], Y.shape[1]
     D = np.diag(Q.sum(axis = 0))
-    L = np.eye(n) - power_diag(D,-0.5) @ Q @ power_diag(D,-0.5)
-
-    lam, eig_V = np.linalg.eig(L)
-    eig_V = eig_V[:,:num_eigen]
+    # scipy的方式较快
+    lam, eig_V = eigh(power_diag(D,-0.5) @ Q @ power_diag(D,-0.5), subset_by_index=[n - num_eigen, n - 1])
 
     U0 = -0.5 * power_diag(D,-1.5) @ Q @ power_diag(D,-0.5)
     U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
     ones = np.ones((n,1))
     U0_ = expand(((U0 * (eig_V @ eig_V.T)) @ ones) @ ones.T, n, d) * gy_Q
-    U1_ = expand(ones @ (ones.T @ (U0 * (eig_V @ eig_V.T))), n, d) * gy_Q
+    U1_ = expand(ones @ (ones.T @ (U1 * (eig_V @ eig_V.T))), n, d) * gy_Q
     D_ =  expand((eig_V @ eig_V.T) * power_diag(D, -1), n, d) * gy_Q
     grad_Y = sum(sum(U0_ + U1_ + D_))
 
-    print('----------- the 5 smallest eigenvalues ---------')
-    print(lam[:5])
-
+    print(f'----------- the {num_eigen} smallest eigenvalues ---------')
+    lam_list.append(lam[:num_eigen])
+    print(lam[:num_eigen])
     return grad_Y
 
 
-def tsne_grad(P, Q, Y, inv_distances, beta, rho, num_eigen):
+
+def gk_grad(Q, Y, inv_distances, num_eigen,sigmas):
+    '''
+    calculate extra part of gradient w.r.t. Y:
+    '''
+    global lam_list
+    def get_K(Y, sigmas):
+        # sigma2 = np.mean(sigmas)
+        sigma2 = 1e0
+        eucdis = cal_euclidean_dis(Y)
+        K = np.exp(-0.5 * eucdis / sigma2)
+        K = K - np.eye(Y.shape[0]) # turn the similarity matrix into affinity matrix
+        return K, sigma2
+
+    def cal_gy_K(gK_L, Y, Kval, sigma2):
+        sigma2 = 1e0
+        Y = Y.T
+        T = gK_L * Kval;
+        C = np.tile(sum(T), (len(Y), 1));
+        g = 2 / sigma2 * (Y @ T - Y * C).T;
+        return g
+
+    print(' ------------Start gk_grad ---------------')
+
+    Kval,sigma2 = get_K(Y,sigmas)
+    Q = Kval #### 这里准备计算 eigenvalue的时候应该是用Kval的，而不是Q
+
+    n, d = Y.shape[0], Y.shape[1]
+    D = np.diag(Q.sum(axis = 0))
+    lam, eig_V = eigh(power_diag(D,-0.5) @ Q @ power_diag(D,-0.5), subset_by_index=[n - num_eigen, n - 1])
+
+    U0 = -0.5 * power_diag(D,-1.5) @ Q @ power_diag(D,-0.5)
+    U1 = -0.5 * power_diag(D,-0.5) @ Q @ power_diag(D,-1.5)
+    grad_LK = (U0+U1+power_diag(D, -1)) * (eig_V @ eig_V.T)
+    grad_Y = cal_gy_K(grad_LK, Y, Kval, sigma2)
+
+
+    # print(f'----------- the {num_eigen} smallest eigenvalues ---------')
+    lam_list.append(lam[:num_eigen])
+    # print(lam[:num_eigen])
+    return grad_Y
+
+
+def tsne_grad(P, Q, eigen_fn,Y,  inv_distances, beta, num_eigen,sigmas):
     """
     Estimate the gradient of t-SNE cost with respect to Y.
     """
@@ -243,45 +298,13 @@ def tsne_grad(P, Q, Y, inv_distances, beta, rho, num_eigen):
 
     # Multiply then sum over j's
     if beta != 0:
-        grad_Y2 = eigen_grad(Q, Y, inv_distances, beta, rho, num_eigen)
-        grad_Y = 4. * (pq_expanded * y_diffs_wt).sum(1) + rho * grad_Y2
-
+        grad_Y2 = eigen_fn(Q, Y, inv_distances, num_eigen,sigmas)
+        grad_Y = 4. * (pq_expanded * y_diffs_wt).sum(1) + beta * grad_Y2
     else:
         grad_Y = 4. * (pq_expanded * y_diffs_wt).sum(1)
-
     print('-------gradient of Y -------')
     print(grad_Y[0])
-
     return grad_Y
-
-def yy_grad(P, Q, Y, distances):
-    """
-    Estimate the gradient of t-SNE cost with respect to Y.
-    """
-
-        #尺度： y'y
-    #    grad = -2 * (P - Q) * P * P @ Y
-        #grad = 2 * np.multiply((P - Q) ,abs(P - np.ones_like(P)/2)) @ Y
-    #     grad = - 2 * np.multiply(np.multiply((P - Q),(P + 0.5 * 1/P)),(P + 0.5 * 1/P)) @ Y
-    #    grad = - 2 * (P - Q) *(P + 0.5 * 1/P) * (P + 0.5 * 1/P) @ Y
-
-        ##改变尺度: (yi - yj)'(yi - yj)
-    #     pq_expanded = np.expand_dims(P - Q, 2)
-    #     y_diffs = np.expand_dims(Y, 1) - np.expand_dims(Y, 0)
-    #     y_diffs_wt = y_diffs * np.power((np.expand_dims(P, 2) + np.expand_dims(P, -1)),2)
-    #     grad = -2. * (pq_expanded * y_diffs_wt).sum(1)
-
-    pq_expanded = np.expand_dims(P - Q, 2) * np.power((np.expand_dims(P, 2) + 0.0009 * np.expand_dims(P, -1)),2)
-    #     pq_expanded = np.expand_dims(P - Q, 2) * np.power(np.expand_dims(P, 2),2)
-
-    y_diffs = np.expand_dims(Y, 1) - np.expand_dims(Y, 0)
-    dij = cal_euclidean_dis(Y)
-    np.fill_diagonal(dij, 1e10)
-    dij = np.tile(np.power(dij,-2),(y_diffs.shape[-1],1,1)).T
-    y_diffs_wt = y_diffs * dij
-    grad = 4. * (pq_expanded * y_diffs_wt).sum(1)
-
-    return grad
 
 ################  embedding algorithms ################
 def init_y(sample_num, sigma, low_dim = 2, random_state = 0):
@@ -300,9 +323,10 @@ def init_y(sample_num, sigma, low_dim = 2, random_state = 0):
 
     return y0
 
-def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rate2,momentum, beta, rho, num_eigen, plot, exa_stage, lst_stage):
-    """Estimates a SNE model.
 
+def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, eigen_fn, learning_rate1, momentum, beta, num_eigen, plot,
+                 exa_stage, lst_stage, rdseed, sigmas, exa_ratio):
+    """Estimates a t-SNE model.
     # Arguments
         X: Input data matrix.
         P: Matrix of joint probabilities.
@@ -312,55 +336,69 @@ def estimate_sne(X, y, P, num_iters, q_fn, grad_fn, learning_rate1, learning_rat
     # Returns:
         Y: Matrix, low-dimensional representation of X.
     """
+    global lam_list
 
     sample_num = X.shape[0]
     sigma = 1e-2
-
-
     # Initialise our 2D representation
     Y = init_y(sample_num, sigma)
-    # Initialise our 2D
-    Q, distances = q_fn(Y)
+    # prepare lambda_list
+    lam_list = list()
 
     # Initialise past values (used for momentum)
     if momentum:
         Y_m2 = Y.copy()
         Y_m1 = Y.copy()
-
+    # calculate the size of each update
+    Y_update_num = int(rdseed * Y.shape[0])
     # Start gradient descent loop
     for i in tqdm(range(num_iters)):
-
         if i < exa_stage:
-            P2 = 4 * P
+            P2 = exa_ratio * P
+            # if i < 20:
+            #     categorical_scatter_2d(Y, y,
+            #                            title=f'Exaggerate Stage (No.{i + 1}; learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
+            #                            alpha=1.0, ms=6,
+            #                            show=True, figsize=(9, 6))
         else:
             P2 = P
-
         if i < num_iters - lst_stage:
             beta2 = 0
             print('beta = 0')
         else:
             beta2 = beta
             print('beta =', beta)
-
-
-        # Estimate gradients with respect to Y
-        grads_Y = grad_fn(P2, Q, Y, distances, beta2, rho, num_eigen)
+            categorical_scatter_2d(Y, y,
+                                   title=f'Plus grad_Y2 (No.{i + 1}; learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
+                                   alpha=1.0, ms=6,
+                                   show=True, figsize=(9, 6))
+        # choose part if Y for update according to rdseed
+        choice = np.random.choice(range(Y.shape[0]), size=(Y_update_num,), replace=False)
+        Y_update = Y[choice, :]
+        P2 = P2[np.ix_(choice, choice)]
+        Q, distances = q_fn(Y_update)
+        grads_Y = grad_fn(P2, Q, eigen_fn, Y_update, distances, beta2, num_eigen, sigmas)
 
         # Update Y
-        Y = Y - learning_rate1 * grads_Y
-        # Get new Q and distances (distances only used for t-SNE)
-        Q, distances = q_fn(Y)
-
+        Y_update = Y_update - learning_rate1 * grads_Y
+        # convert back to n*d
+        Y[choice, :] = Y_update
         if momentum:  # Add momentum
             Y += momentum * (Y_m1 - Y_m2)
             # Update previous Y's for momentum
             Y_m2 = Y_m1.copy()
             Y_m1 = Y.copy()
-
         if plot and i % (num_iters / plot) == 0:
-            categorical_scatter_2d(Y, y, alpha=1.0, ms=6,
+            categorical_scatter_2d(Y, y,
+                                   title=f'No.{i + 1}; learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
+                                   alpha=1.0, ms=6,
                                    show=True, figsize=(9, 6))
+    categorical_scatter_2d(Y, y,
+                           title=f'No.{i + 1} (end); learning_rate1:{learning_rate1}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
+                           alpha=1.0, ms=6,
+                           show=True, figsize=(9, 6), savename='lst_iter.png')
 
-    categorical_scatter_2d(Y, y, alpha=1.0, ms=6,
-                           show=True, figsize=(9, 6))
-    return Y
+    return Y, lam_list
+
+
+
