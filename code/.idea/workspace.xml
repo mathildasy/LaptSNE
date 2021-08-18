@@ -21,9 +21,7 @@
   <component name="ChangeListManager">
     <list default="true" id="5a366585-ac94-4d13-a379-dde362fb23c0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lamda.png" beforeDir="false" afterPath="$PROJECT_DIR$/lamda.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lst_iter.png" beforeDir="false" afterPath="$PROJECT_DIR$/lst_iter.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tSNE_v4py.py" beforeDir="false" afterPath="$PROJECT_DIR$/tSNE_v4py.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tSNE_v4.py" beforeDir="false" afterPath="$PROJECT_DIR$/tSNE_v4.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/test_4.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_4.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -49,7 +47,7 @@
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="settings.editor.selected.configurable" value="configurable.group.build" />
   </component>
-  <component name="RunManager" selected="Python.test_5">
+  <component name="RunManager" selected="Python.test_4">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="code" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -161,6 +159,9 @@
       <module name="code" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
       <option name="SDK_HOME" value="$USER_HOME$/.conda/envs/laplacian_t-SNE/bin/python" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="IS_MODULE_SDK" value="false" />
@@ -185,8 +186,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.test_5" />
         <item itemvalue="Python.test_4" />
+        <item itemvalue="Python.test_5" />
         <item itemvalue="Python.test_3" />
         <item itemvalue="Python.tSNE_min_k_1" />
         <item itemvalue="Python.haha" />
@@ -201,7 +202,8 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1628583018953</updated>
-      <workItem from="1629169766771" duration="11363000" />
+      <workItem from="1629169766771" duration="12130000" />
+      <workItem from="1629295096803" duration="3191000" />
     </task>
     <servers />
   </component>

@@ -230,6 +230,8 @@ def gk_grad(Y,num_eigen, sigmas, UPDATE_SIGMA = True, min_k = False):
 
     if UPDATE_SIGMA:
         grad_sigma = cal_gsigma_K(grad_LK, Y, Kval, sigma2)
+        print('-------gradient of sigma -------')
+        print(grad_sigma)
     else:
         grad_sigma = 0
 
@@ -340,11 +342,12 @@ def estimate_sne(X, y, P, num_iters, q_fn, learning_rate1, learning_rate2, momen
         Y_update = Y[choice, :]
         P2 = P2[np.ix_(choice, choice)]
         Q, distances = q_fn(Y_update)
-        grads_Y, grad_sigma = tsne_grad(P2, Q, Y_update, distances, beta2, beta_3, num_eigen, sigmas, UPDATE_SIGMA = False, min_k = min_k)
+        grads_Y, grad_sigma = tsne_grad(P2, Q, Y_update, distances, beta2, beta_3, num_eigen, sigmas, UPDATE_SIGMA = True, min_k = min_k)
         # Update Y
         Y_update = Y_update - learning_rate1 * grads_Y
         # Update Sigma
-        sigmas -= learning_rate2 * grad_sigma
+        if i > num_iters - lst_stage:
+            sigmas -= learning_rate2 * grad_sigma
         sigmas_list.append(sigmas)
         print(f'No.{i+1} sigma: '+ str(sigmas))
         # convert back to n*d

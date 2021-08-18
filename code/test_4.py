@@ -12,7 +12,7 @@ Notes:
 """
 
 # import tSNE_min_k_1 as ts
-import  tSNE_v5 as ts
+import  tSNE_v4_2 as ts
 from sklearn import datasets
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -47,7 +47,7 @@ BETA = 1e0  # change with delta Y
 BETA_2 = 0.5e-2
 NUM_EIGEN = 10
 RDSEED = 1
-SIGMA = 1e0
+SIGMA = 1.5e0
 MINK = 0
 # data = datasets.load_digits()
 # NUM_SAMPLE = 800
