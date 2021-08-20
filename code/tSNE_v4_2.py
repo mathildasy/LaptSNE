@@ -17,6 +17,7 @@ import seaborn as sns;
 from scipy.spatial import distance as dist
 from tqdm import tqdm
 from scipy.linalg import eigh
+
 sns.set()
 
 ################ visualization function ################
@@ -364,10 +365,12 @@ def estimate_sne(X, y, P, num_iters, q_fn, learning_rate1, learning_rate2, momen
                                    title=f'No.{i + 1}; learning_rate1:{learning_rate1},,learning_rate2:{learning_rate2}, momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
                                    alpha=1.0, ms=6,
                                    show=True, figsize=(9, 6))
+
     categorical_scatter_2d(Y, y,
                            title=f'No.{i + 1} (end); learning_rate1:{learning_rate1}, ,learning_rate2:{learning_rate2},momentum:{momentum}, beta:{beta}, num_eigen:{num_eigen}, exa_stage:{exa_stage}, lst_stage:{lst_stage}',
                            alpha=1.0, ms=6,
                            show=True, figsize=(9, 6), savename='lst_iter.png')
+
     return Y, lam_list, sigmas_list[-lst_stage:]
 
 

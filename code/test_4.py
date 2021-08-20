@@ -16,10 +16,14 @@ import  tSNE_v4_2 as ts
 from sklearn import datasets
 import pandas as pd
 import matplotlib.pyplot as plt
+import scipy.io
+
+
+
 
 SEED = 1  # Random seed
 MOMENTUM = 0.8
-NUM_ITERS = 100
+NUM_ITERS = 1000
 TSNE = True
 TSNE_grad = True
 EXA_RATIO = 4
@@ -36,16 +40,18 @@ NUM_PLOTS = 3
 # GK = 1
 # BETA = 1e-2  # change with delta Y
 
-data = datasets.load_digits()
-NUM_SAMPLE = 400
+# data = datasets.load_digits()
+
+data = scipy.io.loadmat('/Users/haper/Library/Mobile Documents/com~apple~CloudDocs/Desktop/ Research-ML/laplacian_t-SNE/data/COIL100.mat')
+NUM_SAMPLE = 1024
 PERPLEXITY = 25
 LEARNING_RATE = [1e2, 1e-1]  # change with NUM_SAMPLE
-EXAGGERATE_STAGE = 50  # change with NUM_SAMPLE
-LAST_STAGE = 5  # change with NUM_SAMPLE
+EXAGGERATE_STAGE = 100  # change with NUM_SAMPLE
+LAST_STAGE = 50  # change with NUM_SAMPLE
 GK = 1
 BETA = 1e0  # change with delta Y
 BETA_2 = 0.5e-2
-NUM_EIGEN = 10
+NUM_EIGEN = 15
 RDSEED = 1
 SIGMA = 1.5e0
 MINK = 0
@@ -60,9 +66,9 @@ MINK = 0
 # NUM_EIGEN = 12
 # RDSEED = 1
 
-print(data['data'].shape)
-X = data['data'][:NUM_SAMPLE]
-y = data['target'][:NUM_SAMPLE]
+print(data['X'].shape)
+X = data['X'].T[:NUM_SAMPLE]
+y = data['Label'].flatten()[:NUM_SAMPLE]
 
 # Obtain matrix of joint probabilities p_ij
 P, _ = ts.p_joint(X, PERPLEXITY)
