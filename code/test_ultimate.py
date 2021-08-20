@@ -12,7 +12,7 @@ Notes:
 """
 
 # import tSNE_min_k_1 as ts
-import  tSNE_poly as ts
+import  tSNE_ultimate as ts
 from sklearn import datasets
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -48,16 +48,15 @@ PERPLEXITY = 25
 LEARNING_RATE = [1e2, 1e-1]  # change with NUM_SAMPLE
 EXAGGERATE_STAGE = 20  # change with NUM_SAMPLE
 LAST_STAGE = 5  # change with NUM_SAMPLE
-GK = 0
-BETA = 1e2  # change with delta Y
-BETA_2 = 1e0
+GK = 1
+BETA = 1e0  # change with delta Y
+BETA_2 = 1e-2
 NUM_EIGEN = 10
 RDSEED = 1
-SIGMA = 0
+SIGMA = 1e0
 MINK = 0
-GK = 1
-POLY = 2
-C = 2
+POLY = 0
+C = 0
 # data = datasets.load_digits()
 # NUM_SAMPLE = 800
 # PERPLEXITY = 30
@@ -72,16 +71,43 @@ C = 2
 print(data['data'].shape)
 X = data['data'][:NUM_SAMPLE]
 y = data['target'][:NUM_SAMPLE]
-
+from scipy.linalg import eigh
+import numpy as np
 # Obtain matrix of joint probabilities p_ij
-P, _ = ts.p_joint(X, PERPLEXITY)
-print(_)
+num_eigen = NUM_EIGEN # 这里采取最优的组数（比如COIL20有20组）
+perpelxity_range = np.arange(20,40) # 经验区间
+eigenRatio_list = list()
+P_list = list()
+for perplexity in perpelxity_range:
+    P, _ = ts.p_joint(X, perplexity)
+    D_ = np.diag(np.power(P.sum(axis = 1),-0.5))
+    n = P.shape[0]
+    w, v = eigh(np.eye(n) - D_ @ P @ D_)
+    eigenRatio = np.diff(w)/w[1:]
+    eigenRatio_list.append(eigenRatio)
+    P_list.append(P)
+
+    show = 5
+    plt.plot(np.arange(1,num_eigen + show+1),eigenRatio[:num_eigen + show])
+    plt.title(f'Eigen Ratio @ Perplexity:{perplexity}')
+    plt.show()
+
+eigenRatio_df = pd.DataFrame(eigenRatio_list)
+index = np.argmax(eigenRatio_df.iloc[:,num_eigen])
+opt_perplexity = perpelxity_range[index]
+print(f'The Optimal Perplexity is {opt_perplexity}')
+P = P_list[index]
+
+plt.plot(perpelxity_range, eigenRatio_df.iloc[:,num_eigen])
+plt.title(f'Optimal Perplexity is {opt_perplexity}')
+plt.show()
+
+
 # Fit SNE or t-SNE
 Y, lam_list, sigmas_list = ts.estimate_sne(X, y, P,
                      num_iters=NUM_ITERS,
                      q_fn= ts.q_tsne if TSNE else ts.q_joint,
-                     # grad = ts.gk_grad if GK else ts.poly_grad,
-                     grad=ts.poly_grad,
+                     grad = ts.gk_grad if GK else ts.poly_grad,
                      learning_rate1=LEARNING_RATE[0],
                      learning_rate2=LEARNING_RATE[1],
                      momentum=MOMENTUM,

@@ -267,7 +267,7 @@ def poly_grad(Y, num_eigen,sigmas, UPDATE_SIGMA, min_k, poly,const):
     grad_Y3 = 2 * poly * (grad_LK1 * (np.power((Y @ Y.T + const), (poly - 1)))) @ Y
     grad_sigma = 0
     lam_list.append(lam)
-    print(' ------------trance ---------------')
+    print(' ------------cost ---------------')
     print(np.trace(eig_V.T @ (np.identity(n) - power_diag(D, -0.5) @ Kval @ power_diag(D, -0.5)) @ eig_V))
     return  grad_Y, grad_Y3, grad_sigma
 
