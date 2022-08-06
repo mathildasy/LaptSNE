@@ -1,10 +1,9 @@
 from libc cimport math
-cimport cython
 import numpy as np
-cimport numpy as np
+cimport numpy as cnp
 from libc.stdio cimport printf
 
-np.import_array()
+cnp.import_array()
 
 
 cdef extern from "numpy/npy_math.h":
@@ -14,8 +13,8 @@ cdef extern from "numpy/npy_math.h":
 cdef float EPSILON_DBL = 1e-8
 cdef float PERPLEXITY_TOLERANCE = 1e-5
 
-cpdef np.ndarray[np.float32_t, ndim=2] _binary_search_perplexity(
-        np.ndarray[np.float32_t, ndim=2] sqdistances,
+cpdef cnp.ndarray[cnp.float32_t, ndim=2] _binary_search_perplexity(
+        cnp.ndarray[cnp.float32_t, ndim=2] sqdistances,
         float desired_perplexity,
         int verbose):
     """Binary search for sigmas of conditional Gaussians.
@@ -65,7 +64,7 @@ cpdef np.ndarray[np.float32_t, ndim=2] _binary_search_perplexity(
 
     # This array is later used as a 32bit array. It has multiple intermediate
     # floating point additions that benefit from the extra precision
-    cdef np.ndarray[np.float64_t, ndim=2] P = np.zeros(
+    cdef cnp.ndarray[cnp.float64_t, ndim=2] P = np.zeros(
         (n_samples, n_neighbors), dtype=np.float64)
 
     for i in range(n_samples):
@@ -91,7 +90,6 @@ cpdef np.ndarray[np.float32_t, ndim=2] _binary_search_perplexity(
             for j in range(n_neighbors):
                 P[i, j] /= sum_Pi
                 sum_disti_Pi += sqdistances[i, j] * P[i, j]
-            
 
             entropy = math.log(sum_Pi) + beta * sum_disti_Pi
             entropy_diff = entropy - desired_entropy
@@ -117,7 +115,6 @@ cpdef np.ndarray[np.float32_t, ndim=2] _binary_search_perplexity(
         if verbose and ((i + 1) % 1000 == 0 or i + 1 == n_samples):
             print("[t-SNE] Computed conditional probabilities for sample "
                   "%d / %d" % (i + 1, n_samples))
-
 
     if verbose:
         print("[t-SNE] Mean sigma: %f"

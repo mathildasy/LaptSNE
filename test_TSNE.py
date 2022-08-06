@@ -15,6 +15,7 @@ def append_log(vis,info):
     # print (line)
     vis.text(line, win=log_win, append=True)
 
+
 def laplacian_TSNE(KLnum, beta, num_eigen, dataname = 'COIL100', lst_stage = 0, lst_coef = 1, n_components = 2):
 
     NUM_ITERS = 500
@@ -108,6 +109,7 @@ if __name__ == '__main__':
     lst_coef = 1
     lst_stage = 0
     dataname = 'COIL20'
+    print(KLnum, beta, num_eigen, dataname)
     laplacian_TSNE(KLnum, beta, num_eigen, dataname = dataname, n_components = 2)
 
 
