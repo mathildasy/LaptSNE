@@ -2,4 +2,4 @@ __pycache__
 .idea
 output
 scikit-learn
-.DS_Store
+./.DS_Store

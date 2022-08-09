@@ -97,7 +97,7 @@ def laplacian_TSNE(KLnum, beta, num_eigen, dataname = 'COIL100', n_components = 
 
 if __name__ == '__main__':
     KLnum=0
-    beta = 3e-2
+    beta = 2e-2
     num_eigen = 19
     dataname = 'COIL20'
     print(KLnum, beta, num_eigen, dataname)

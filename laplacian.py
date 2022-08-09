@@ -2,10 +2,10 @@ import numpy as np
 from scipy.sparse.linalg import svds
 from sklearn.preprocessing import normalize
 from scipy.spatial.distance import pdist, squareform
-from ..metrics.pairwise import pairwise_distances
-from ..neighbors import kneighbors_graph
-from ..utils.extmath import randomized_svd
-from ..cluster import SpectralClustering
+from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.neighbors import kneighbors_graph
+from sklearn.utils.extmath import randomized_svd
+from sklearn.cluster import SpectralClustering
 
 def power_diag(D, power):
     D_new = np.diag(np.power(np.diag(D), power))

@@ -29,7 +29,7 @@ from ..utils.validation import check_non_negative
 from ..utils._param_validation import Interval, StrOptions, Hidden
 from ..decomposition import PCA
 from ..metrics.pairwise import pairwise_distances, _VALID_METRICS
-from .laplacian import g_grad, t_grad
+from laplacian import g_grad, t_grad, power_diag
 
 
 # mypy error: Module 'sklearn.manifold' has no attribute '_utils'
@@ -2017,11 +2017,7 @@ class TSNE(BaseEstimator):
             X_embedded = 1e-4 * random_state.randn(
                 n_samples, self.n_components).astype(np.float32)
         elif self.init == 'spectral':
-
-            def power_diag(D, power):
-                D_new = np.diag(np.power(np.diag(D), power))
-                return D_new
-
+            # FIXME: added
             D = np.diag(squareform(P).sum(axis=1))
             _, X_embedded = linalg.eigh(np.eye(D.shape[0]) - power_diag(D, -0.5) @ squareform(P) @ power_diag(D, -0.5),
                                         subset_by_index=[1, self.n_components])
