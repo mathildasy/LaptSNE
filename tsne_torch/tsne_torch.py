@@ -314,7 +314,7 @@ class TorchTSNE:
         score = 0
         num_class = len(np.unique(y.ravel))
         for t in range(5):
-            y_pred = KMeans(n_clusters=num_class, random_state=t).fit_predict(X_embedded)
+            y_pred = KMeans(n_clusters=num_class, random_state=t, n_init='auto').fit_predict(X_embedded)
             score += acc(y.ravel(), y_pred)
         score = score/5
         kMeans_report = ['initial', score]
@@ -414,7 +414,7 @@ class TorchTSNE:
                 # print('--------Calculate K-Means Score-------')
                 score = 0
                 for t in range(5):
-                    y_pred = KMeans(n_clusters=num_eigen, random_state=t).fit_predict(X_embedded)
+                    y_pred = KMeans(n_clusters=num_eigen, random_state=t, n_init='auto').fit_predict(X_embedded)
                     score += acc(y.ravel(), y_pred)
                 score = score/5
                 kMeans_report = [it, score]

@@ -5,26 +5,26 @@ from visdom import Visdom
 
 # import external library
 import torch
-import numpy as np
-from scipy.spatial.distance import squareform
+# import numpy as np
+# from scipy.spatial.distance import squareform
 
 # import local pakages
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
+# from sklearn.manifold import TSNE
+# from sklearn.decomposition import PCA
 from tsne_torch import TorchTSNE as torchTSNE
-import load_data
+from load_data import *
 
 # DEVICE = torch.device('cuda:')
 DEVICE = 'cpu'
 
 NUM_SAMPLES = -1
 DATASET = {
-    'PenDigits': load_data.digits,
-    'COIL20': load_data.COIL20,
-    'COIL100': load_data.COIL100,
-    'MNIST':load_data.MNIST,
-    'Fashion MNIST':load_data.Fashion_MNIST,
-    'CIFAR100': load_data.CIFAR100,
+    'Iris': iris,
+    'PenDigits': digits,
+    'COIL20': COIL20,
+    # 'COIL100': load_data.COIL100,
+    # 'MNIST':load_data.MNIST,
+    # 'Fashion MNIST':load_data.Fashion_MNIST,
 }
 
 DATANAME = 'COIL20'
@@ -36,7 +36,7 @@ X = torch.Tensor(X).type(torch.float64)
 
 # prepare hyperparameters
 NUM_ITER = 500
-LEARNING_RATE = 1e2
+LEARNING_RATE = 1e1
 KLNUM = 0
 BETA = 1e-2
 NUM_EIGEN = 19
@@ -44,7 +44,7 @@ LAST_STAGE = 0
 LASTCOEF = 1
 
 # prepare visualization
-ENV = f'{DATANAME}: tsneTorch {KLNUM}+{BETA}+{NUM_EIGEN}+{LAST_STAGE}+{LASTCOEF}'
+ENV = f'{DATANAME}: tsneTorch {LEARNING_RATE}+{KLNUM}+{BETA}+{NUM_EIGEN}+{LAST_STAGE}+{LASTCOEF}'
 vis = Visdom(env = ENV)
 
 # prepare save path
@@ -55,6 +55,7 @@ if not os.path.exists(out_dir2): os.makedirs(out_dir2)
 out_dir3 = os.path.join(out_dir2, 'image')
 if not os.path.exists(out_dir3): os.makedirs(out_dir3)
 
+print(ENV)
 
 X_emb = torchTSNE(n_components=2, perplexity = opt_perplexity, n_iter=NUM_ITER, initial_dims = 0,
                 verbose=True, kl_num = KLNUM, beta = BETA, 

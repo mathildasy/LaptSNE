@@ -18,8 +18,6 @@ import scipy.io
 PATH = './data/'
 
 
-# fmnist = sklearn.datasets.fetch_openml('Fashion-MNIST')
-
 def iris(num_samples=-1, seed=0):
     data = datasets.load_iris()
     if num_samples >= 0:
@@ -50,31 +48,31 @@ def digits(num_samples=-1, seed=0):
     return X, y
 
 
-def MNIST(num_samples = -1, seed = 0):
-    X,y = np.load(PATH + 'MNIST_X.npy'), np.load(PATH + 'MNIST_y.npy')
-    # if num_samples >=0:
-    #     np.random.seed(seed)
-    #     select = np.random.choice(np.arange(X.shape[0]), size = num_samples)
-    #     X = X[select]
-    #     y = y[select]
+# def MNIST(num_samples = -1, seed = 0):
+#     X,y = np.load(PATH + 'MNIST_X.npy'), np.load(PATH + 'MNIST_y.npy')
+#     # if num_samples >=0:
+#     #     np.random.seed(seed)
+#     #     select = np.random.choice(np.arange(X.shape[0]), size = num_samples)
+#     #     X = X[select]
+#     #     y = y[select]
 
-    # if num_samples < 0: num_samples = X.shape[0]
-    X, y = X[-10000:,:], y[-10000:]
-    print(f'--------Finish loading MNIST dataset [size: {num_samples}, shape: {X.shape}]--------')
-    return X, y
+#     # if num_samples < 0: num_samples = X.shape[0]
+#     X, y = X[-10000:,:], y[-10000:]
+#     print(f'--------Finish loading MNIST dataset [size: {num_samples}, shape: {X.shape}]--------')
+#     return X, y
 
-def Fashion_MNIST(num_samples = -1, seed = 0):
-    X,y = np.load(PATH + 'Fashion-MNIST_X.npy'), np.load(PATH + 'Fashion-MNIST_y.npy')
-    # if num_samples >=0:
-    #     np.random.seed(seed)
-    #     select = np.random.choice(np.arange(X.shape[0]), size = num_samples)
-    #     X = X[select]
-    #     y = y[select]
+# def Fashion_MNIST(num_samples = -1, seed = 0):
+#     X,y = np.load(PATH + 'Fashion-MNIST_X.npy'), np.load(PATH + 'Fashion-MNIST_y.npy')
+#     # if num_samples >=0:
+#     #     np.random.seed(seed)
+#     #     select = np.random.choice(np.arange(X.shape[0]), size = num_samples)
+#     #     X = X[select]
+#     #     y = y[select]
 
-    # if num_samples < 0: num_samples = X.shape[0]
-    X, y = X[-10000:,:], y[-10000:]
-    print(f'--------Finish loading Fashion MNIST dataset [size: {num_samples}, shape: {X.shape}]--------')
-    return X, y
+#     # if num_samples < 0: num_samples = X.shape[0]
+#     X, y = X[-10000:,:], y[-10000:]
+#     print(f'--------Finish loading Fashion MNIST dataset [size: {num_samples}, shape: {X.shape}]--------')
+#     return X, y
 
 
 def COIL20(num_samples=-1, seed=0):
@@ -91,33 +89,19 @@ def COIL20(num_samples=-1, seed=0):
     return X, y
 
 
-def COIL100(num_samples=-1, seed=0):
-    data = scipy.io.loadmat(PATH + 'COIL100.mat')
-    if num_samples > 0:
-        np.random.seed(seed)
-        select = np.random.choice(np.arange(data['Label'].shape[0]), size=num_samples)
-        X = data['X'].T[select]
-        y = data['Label'][select]
+# def COIL100(num_samples=-1, seed=0):
+#     data = scipy.io.loadmat(PATH + 'COIL100.mat')
+#     if num_samples > 0:
+#         np.random.seed(seed)
+#         select = np.random.choice(np.arange(data['Label'].shape[0]), size=num_samples)
+#         X = data['X'].T[select]
+#         y = data['Label'][select]
 
-    else:
-        X, y = data['X'].T, data['Label']
+#     else:
+#         X, y = data['X'].T, data['Label']
 
-    if num_samples < 0: num_samples = X.shape[0]
-    print(X.shape, y.shape)
-    # print(np.unique(y)) # 100
-    print(f'--------Finish loading COIL100 dataset [size: {num_samples}, shape: {X.shape}]--------')
-    return X, y.ravel()
-
-def CIFAR100(num_samples=-1, seed=0):
-    X, y = np.load(PATH + 'CIFAR100_X.npy'), np.load(PATH + 'CIFAR100_y.npy')
-    if num_samples >= 0:
-        np.random.seed(seed)
-        select = np.random.choice(np.arange(X.shape[0]), size=num_samples)
-        X = X[select]
-        y = y[select]
-
-    if num_samples < 0: num_samples = X.shape[0]
-    print(f'--------Finish loading CIFAR100 dataset [size: {num_samples}, shape: {X.shape}]--------')
-    # y = np.array([int(i) for i in y])
-    return X, y
-
+#     if num_samples < 0: num_samples = X.shape[0]
+#     print(X.shape, y.shape)
+#     # print(np.unique(y)) # 100
+#     print(f'--------Finish loading COIL100 dataset [size: {num_samples}, shape: {X.shape}]--------')
+#     return X, y.ravel()
