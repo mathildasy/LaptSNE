@@ -1,37 +1,44 @@
-# # Author: Alexander Fabisch  -- <afabisch@informatik.uni-bremen.de>
-# # Author: Christopher Moody <chrisemoody@gmail.com>
-# # Author: Nick Travers <nickt@squareup.com>
-# # License: BSD 3 clause (C) 2014
+# Author: Alexander Fabisch  -- <afabisch@informatik.uni-bremen.de>
+# Author: Christopher Moody <chrisemoody@gmail.com>
+# Author: Nick Travers <nickt@squareup.com>
+# License: BSD 3 clause (C) 2014
 
-# # This is the exact and Barnes-Hut t-SNE implementation. There are other
-# # modifications of the algorithm:
-# # * Fast Optimization for t-SNE:
-# #   https://cseweb.ucsd.edu/~lvdmaaten/workshops/nips2010/papers/vandermaaten.pdf
+# This is the exact and Barnes-Hut t-SNE implementation. There are other
+# modifications of the algorithm:
+# * Fast Optimization for t-SNE:
+#   https://cseweb.ucsd.edu/~lvdmaaten/workshops/nips2010/papers/vandermaaten.pdf
 
-# import warnings
-# from time import time
-# import numpy as np
-# from scipy import linalg
-# from scipy.spatial.distance import pdist
-# from scipy.spatial.distance import squareform
-# from scipy.sparse import csr_matrix, issparse
-# from numbers import Integral, Real
-# from ..neighbors import NearestNeighbors
-# from ..base import BaseEstimator
-# from ..utils import check_random_state
-# from ..utils._openmp_helpers import _openmp_effective_n_threads
-# from ..utils.validation import check_non_negative
-# from ..utils._param_validation import Interval, StrOptions, Hidden
-# from ..decomposition import PCA
-# from ..metrics.pairwise import pairwise_distances, _VALID_METRICS
+import seaborn as sns
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import csv
+import os
+import warnings
+from time import time
+import numpy as np
+from scipy import linalg
+from scipy.spatial.distance import pdist
+from scipy.spatial.distance import squareform
+from scipy.sparse import csr_matrix, issparse
+from numbers import Integral, Real
+from ..neighbors import NearestNeighbors, KNeighborsClassifier
+from ..base import BaseEstimator
+from ..utils import check_random_state
+from ..utils._openmp_helpers import _openmp_effective_n_threads
+from ..utils.validation import check_non_negative
+from ..utils._param_validation import Interval, StrOptions, Hidden
+from ..decomposition import PCA
+from ..metrics.pairwise import pairwise_distances, _VALID_METRICS
+from .laplacian import g_grad, t_grad
 
-# # mypy error: Module 'sklearn.manifold' has no attribute '_utils'
-# from . import _utils  # type: ignore
 
-# # mypy error: Module 'sklearn.manifold' has no attribute '_barnes_hut_tsne'
-# from . import _barnes_hut_tsne  # type: ignore
+# mypy error: Module 'sklearn.manifold' has no attribute '_utils'
+from . import _utils  # type: ignore
 
-# MACHINE_EPSILON = np.finfo(np.double).eps
+# mypy error: Module 'sklearn.manifold' has no attribute '_barnes_hut_tsne'
+from . import _barnes_hut_tsne  # type: ignore
+
+MACHINE_EPSILON = np.finfo(np.double).eps
 
 
 # def _joint_probabilities(distances, desired_perplexity, verbose):
@@ -1162,51 +1169,6 @@
 #     def _more_tags(self):
 #         return {"pairwise": self.metric == "precomputed"}
 
-# Author: Alexander Fabisch  -- <afabisch@informatik.uni-bremen.de>
-# Author: Christopher Moody <chrisemoody@gmail.com>
-# Author: Nick Travers <nickt@squareup.com>
-# License: BSD 3 clause (C) 2014
-
-# This is the exact and Barnes-Hut t-SNE implementation. There are other
-# modifications of the algorithm:
-# * Fast Optimization for t-SNE:
-#   https://cseweb.ucsd.edu/~lvdmaaten/workshops/nips2010/papers/vandermaaten.pdf
-
-
-import csv
-import os
-import warnings
-from time import time
-import numpy as np
-from scipy import linalg
-from scipy.spatial.distance import pdist
-from scipy.spatial.distance import squareform
-from scipy.sparse import csr_matrix, issparse
-from ..neighbors import NearestNeighbors, KNeighborsClassifier, kneighbors_graph
-# from ..cluster import KMeans
-from .. import metrics
-from ..base import BaseEstimator
-from ..utils import check_random_state
-from ..utils._openmp_helpers import _openmp_effective_n_threads
-from ..utils.validation import check_non_negative
-from ..utils.validation import _deprecate_positional_args
-from ..decomposition import PCA
-from ..metrics.pairwise import pairwise_distances
-# mypy error: Module 'sklearn.manifold' has no attribute '_utils'
-from . import _utils  # type: ignore
-# mypy error: Module 'sklearn.manifold' has no attribute '_barnes_hut_tsne'
-from . import _barnes_hut_tsne  # type: ignore
-from scipy.linalg import eigh
-from sklearn import cluster
-from scipy.sparse.linalg import svds
-from sklearn.preprocessing import normalize
-from ..utils.extmath import randomized_svd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-
-MACHINE_EPSILON = np.finfo(np.double).eps
-
 
 def _joint_probabilities(distances, desired_perplexity, verbose):
     """Compute joint probabilities p_ij from distances.
@@ -1347,10 +1309,10 @@ def _kl_divergence(params, P, degrees_of_freedom, n_samples, n_components,
     c = 2.0 * (degrees_of_freedom + 1.0) / degrees_of_freedom
     grad *= c
     # print(f'======== KL divergence is {kl_divergence} ========')
-    return kl_divergence, grad, dist
+    return kl_divergence, grad
 
 
-@_deprecate_positional_args
+
 def trustworthiness(X, X_embedded, *, n_neighbors=5, metric='euclidean'):
     r"""Expresses to what extent the local structure is retained.
     The trustworthiness is within [0, 1]. It is defined as
@@ -1628,17 +1590,15 @@ class TSNE(BaseEstimator):
     # Control the number of iterations between progress checks
     _N_ITER_CHECK = 50
 
-    @_deprecate_positional_args
     def __init__(self, n_components=2, *, perplexity=30.0,
                  early_exaggeration=12.0, learning_rate=200.0, n_iter=1000,
                  n_iter_without_progress=300, min_grad_norm=1e-7,
                  metric="euclidean", init="random", verbose=0, kernel='Gaussian',
                  random_state=None, method='exact', angle=0.5,
-                 n_jobs=None, square_distances='legacy', vis=None, label=None,
-                 lst_stage=5, num_eigen=0, beta=1e0, exag_stage=250,
-                 kl_num=20, new_obj='firstK', obj_F=None, lastcoef=2,
-                 opt_method='momentum', knn_type='small', sigman_type='constant', sigman_constant=1e1,
-                 P_eigen=False, proxy=False, num_proxies=2000, out_dir=None):
+                 n_jobs=None, square_distances='legacy', 
+                 vis=None, label=None, num_eigen=0, beta=1e0, exag_stage=250,
+                 new_obj='firstK', knn_type='small', sigman_type='constant', sigman_constant=1e1,
+                 out_dir=None):
         self.n_components = n_components
         self.perplexity = perplexity
         self.early_exaggeration = early_exaggeration
@@ -1656,22 +1616,14 @@ class TSNE(BaseEstimator):
         self.square_distances = square_distances
         self.vis = vis
         self.y = label
-        self.lst_stage = lst_stage
         self.num_eigen = num_eigen
         self.beta = beta
         self._EXPLORATION_N_ITER = exag_stage
         self.kernel = kernel
-        self.lastcoef = lastcoef
-        self.kl_num = kl_num
         self.new_obj = new_obj
-        self.obj_F = obj_F
-        self.opt_method = opt_method
         self.knn_type = knn_type
         self.sigman_type = sigman_type
         self.sigman = sigman_constant
-        self.P_eigen = P_eigen
-        self.proxy = proxy,
-        self.num_proxies = num_proxies
         self.output_dir = out_dir
 
     def _gradient_descent(self, objective, p0, it, n_iter, X=None,
@@ -1727,391 +1679,7 @@ class TSNE(BaseEstimator):
             Optimum.
         i : int
             Last iteration.
-        """
-        global adam_m, adam_v, K_coef
-
-        def gk_grad(Y, num_eigen, lambda_list, new_obj, P, min_k=False, UPDATE_SIGMA=False):
-            '''
-            calculate extra part of gradient w.r.t. Y:
-            '''
-            global lam_list
-
-            def power_diag(D, power):
-                D_new = np.diag(np.power(np.diag(D), power))
-                return D_new
-
-            def get_Q(Y, sigman):
-                eucdis = pairwise_distances(Y) ** 2
-                K = np.exp(-0.5 * eucdis / sigman)
-                K = K - np.eye(Y.shape[0])  # turn the similarity matrix into affinity matrix
-                Q = 0.5 * (K + K.T)
-                return Q
-
-            def cal_gy_K(gK_L, Y, Q, sigman):
-                '''
-                input:
-                    Y: required shape: (n, d)
-                output:
-                    g: shape (n,d)
-                '''
-                n, d = Y.shape[0], Y.shape[1]
-                Kval = Q / np.tile(sigman, (n, 1))
-                T = gK_L * Kval  # (n,n)
-                C = np.tile(sum(T), (d, 1)).T
-                g = (T + T.T) @ Y - Y * C  # (n,2)
-                return g
-
-            def cal_gk_L(A, coef, M):
-                n = A.shape[0]
-                D = np.diag(A.sum(axis=0))  # column sum
-                U0 = -0.5 * power_diag(D, -1.5) @ A @ power_diag(D, -0.5) * coef;
-                U0 = np.tile(U0.sum(axis=0), (n, 1)).T
-                U1 = -0.5 * power_diag(D, -0.5) @ A @ power_diag(D, -1.5) * coef;
-                U1 = np.tile(U1.sum(axis=1), (n, 1))
-                U2 = np.tile(power_diag(D, -0.5).sum(axis=0), (n, 1)).T * np.tile(power_diag(D, -0.5).sum(axis=1),
-                                                                                  (n, 1)) * coef
-                grad_LK = -(U0 + U1 + U2) * M
-                return grad_LK
-
-            print(' ------------Start gk_grad ---------------')
-            M = kneighbors_graph(Y, self.kneigh, mode='connectivity', include_self=False)
-            M = M.toarray()
-            eucdis = pairwise_distances(Y) ** 2
-            n = Y.shape[0]
-
-            # TODO: Search for asymmtric sigma supports
-            if self.sigman_type == 'constant':
-                sigman = self.sigman
-            else:
-                sigman = np.tile((eucdis * M).mean(axis=1), (n, 1)).T
-            Q = get_Q(Y, sigman)
-            D = np.diag(Q.sum(axis=0))
-            A_normalized = power_diag(D, -0.5) @ Q @ power_diag(D, -0.5)
-
-            lam, eigenVectors = linalg.eigh(A_normalized, subset_by_index=[n - num_eigen - 1, n - 1])
-            eigenGap = lam[1] - lam[0];
-            lam_Kplus1 = 1 - lam[0]
-            eigenGapRatio = eigenGap / lam_Kplus1
-            print('lam_Kplus1 is', lam_Kplus1)
-            print('Current eigenGapRatio is ', eigenGapRatio)
-
-            eig_V = eigenVectors[:, 1:]
-            lam_first = 1 - lam[1:-1]
-            lam_coef = 1 / lam_first
-            eig_V[:, :-1] = lam_coef ** (1 / 2) * eig_V[:, :-1]
-            if self.P_eigen:
-                D_P = np.diag(P.sum(axis=0))
-                K_P = power_diag(D_P, -0.5) @ P @ power_diag(D_P, -0.5)
-                lam_P, eigenVectors_P = linalg.eigh(K_P, subset_by_index=[n - num_eigen - 1, n - 1])
-                eig_V_P = eigenVectors_P[:, 1:]
-                lam_first_P = 1 - lam_P[1:-1]
-                lam_coef_P = 1 / lam_first_P
-                eig_V_P[:, :-1] = lam_coef_P ** (1 / 2) * eig_V_P[:, :-1]
-                coef = self.beta * ((eig_V - eig_V_P) @ (eig_V - eig_V_P).T)
-            else:
-                coef = self.beta * (eig_V @ eig_V.T)
-
-            grad_LK = cal_gk_L(Q, coef, M)
-            grad_Y = cal_gy_K(grad_LK, Y, Q, sigman).ravel()
-            lambda_list.append(lam)
-
-            error = self.beta * (num_eigen - sum(lam[1:]))
-
-            return error, grad_Y, lam
-
-        def gk_grad_2(Y, num_eigen, lambda_list, new_obj, min_k=False, UPDATE_SIGMA=False):
-
-            '''
-            calculate extra part of gradient w.r.t. Y:
-            '''
-            global lam_list
-
-            def binary_search(eval_fn, target, tol=1e-10, max_iter=10000, lower=1e-20, upper=1000.):
-                """Perform a binary search over input values to eval_fn.
-
-                # Arguments
-                    eval_fn: Function that we are optimising over.
-                    target: Target value we want the function to output.
-                    tol: Float, once our guess is this close to target, stop.
-                    max_iter: Integer, maximum num. iterations to search for.
-                    lower: Float, lower bound of search range.
-                    upper: Float, upper bound of search range.
-                # Returns:
-                    Float, best input value to function found during search.
-                """
-                for i in range(max_iter):
-                    guess = (lower + upper) / 2.
-                    val = eval_fn(guess)
-                    if val > target:
-                        upper = guess
-                    else:
-                        lower = guess
-                    if np.abs(val - target) <= tol:
-                        break
-                return guess
-
-            def softmax(X, diag_zero=True):
-                """Take softmax of each row of matrix X."""
-                # Subtract max for numerical stability
-                e_x = np.exp(X - np.max(X, axis=1).reshape([-1, 1]))
-                # We usually want diagonal probailities to be 0.
-                if diag_zero:
-                    np.fill_diagonal(e_x, 0.)
-                # Add a tiny constant for stability of log we take later
-                e_x = e_x + 1e-8  # numerical stability
-
-                return e_x / e_x.sum(axis=1).reshape([-1, 1])
-
-            def calc_prob_matrix(distances, sigmas=None):
-                """Convert a distances matrix to a matrix of probabilities."""
-                if sigmas is not None:
-                    two_sig_sq = 2. * np.square(sigmas.reshape((-1, 1)))
-                    return softmax(distances / two_sig_sq)
-                else:
-                    return softmax(distances)
-
-            def cal_degree(Dist, sigmas):
-
-                """Wrapper function for quick calculation of
-                perplexity over a distance matrix."""
-                return calc_prob_matrix(Dist, sigmas).sum(axis=1)
-
-            def find_optimal_sigmas(distances, target_k=self.kneigh):
-                """For each row of distances matrix, find sigma that results
-                in target perplexity for that role."""
-                sigmas = []
-                # For each row of the matrix (each point in our dataset)
-                for i in range(distances.shape[0]):
-                    # Make fn that returns perplexity of this row given sigma
-                    eval_fn = lambda sigma: \
-                        cal_degree(distances[i:i + 1, :], np.array(sigma))
-                    # Binary search over sigmas to achieve target perplexity
-                    correct_sigma = binary_search(eval_fn, np.log(target_k))
-                    # Append the resulting sigma to our output array
-                    sigmas.append(correct_sigma)
-                return np.array(sigmas)
-
-            def power_diag(D, power):
-                D_new = np.diag(np.power(np.diag(D), power))
-                return D_new
-
-            def get_K(Y):
-                n = Y.shape[0]
-                Dist = pairwise_distances(Y) ** 2
-                M = kneighbors_graph(Y, self.kneigh, mode='connectivity', include_self=False)
-                M = M.toarray()
-                Dist = (Dist * M) - (Dist * M).min(axis=1)
-                np.fill_diagonal(Dist, 0)
-                print('------ Starting Search for Sigma -------')
-                # sigma2 = find_optimal_sigmas(Dist, self.kneigh)
-                # sigma2_ = np.tile((Dist * M).mean(axis = 1), (2,1)).T
-                # sigma2 = np.tile((Dist * M).mean(axis = 1), (n,1)).T
-                sigma2_ = sigma2 = 1
-                K = np.exp(- 0.5 * Dist / sigma2)
-                print('------ Finish Preparing K -------')
-                return K, sigma2_
-
-            def cal_gy_K(gK_L, Y, Kval, sigma2):
-                Y = Y.T
-                T = gK_L * Kval
-                C = np.tile(sum(T), (len(Y), 1))
-                g = 2 / sigma2 * (Y @ T - Y * C).T
-
-                return g
-
-            def cal_gk_L(A, coef):
-                n = A.shape[0]
-                D = np.diag(A.sum(axis=0))  # column sum
-                U0 = -0.5 * power_diag(D, -1.5) @ A @ power_diag(D, -0.5) * coef
-                U1 = -0.5 * power_diag(D, -0.5) @ A @ power_diag(D, -1.5) * coef
-                U0 = np.tile(U0.sum(axis=0), (n, 1)).T
-                U1 = np.tile(U1.sum(axis=1), (n, 1))
-                U2 = np.tile(power_diag(D, -0.5).sum(axis=0), (n, 1)).T * np.tile(power_diag(D, -0.5).sum(axis=1),
-                                                                                  (n, 1)) * coef
-                grad_LK = -(U0 + U1 + U2)
-                return grad_LK
-
-            print(' ------------Start gk_grad ---------------')
-
-            Kval, sigma2 = get_K(Y)
-            n = Y.shape[0]
-            D = np.diag(Kval.sum(axis=0))
-            K_ = power_diag(D, -0.5) @ Kval @ power_diag(D, -0.5)
-
-            lam, eigenVectors = linalg.eigh(K_, subset_by_index=[n - num_eigen - 1, n - 1])
-            eigenGap = lam[1] - lam[0];
-            lam_Kplus1 = 1 - lam[0]
-            eigenGapRatio = eigenGap / lam_Kplus1
-            print('lam_Kplus1 is', lam_Kplus1)
-            print('Current eigenGapRatio is ', eigenGapRatio)
-
-            eig_V = eigenVectors[:, 1:]
-            # lam_first = 1 - lam[1:]
-            # lam_first[-1] = (lam_first[-2]**2 / lam_first[-3])+ 1e-6
-            # lam_coef = 1 / lam_first
-            # eig_V = (lam_coef ** (1/2)) * eig_V
-            coef = self.beta * (eig_V @ eig_V.T)  # num_eigen * num_sample
-
-            grad_LK = cal_gk_L(Kval, coef)
-            grad_Y = cal_gy_K(grad_LK, Y, Kval, sigma2).ravel()
-            lambda_list.append(lam)
-
-            error = self.beta * (num_eigen - sum(lam[1:]))
-
-            return error, grad_Y, lambda_list
-
-        def t_grad(Y, num_eigen, dist, lambda_list, new_obj, P, min_k=False):
-
-            def power_diag(D, power):
-                D_new = np.diag(np.power(np.diag(D), power))
-                return D_new
-
-            def cal_gk_L(A, coef):
-                n = A.shape[0]
-                D = np.diag(A.sum(axis=0))  # column sum
-                U0 = -0.5 * power_diag(D, -1.5) @ A @ power_diag(D, -0.5) * coef
-                U1 = -0.5 * power_diag(D, -0.5) @ A @ power_diag(D, -1.5) * coef
-                U0 = np.tile(U0.sum(axis=0), (n, 1)).T
-                U1 = np.tile(U1.sum(axis=1), (n, 1))
-                U2 = np.tile(power_diag(D, -0.5).sum(axis=0), (n, 1)).T * np.tile(power_diag(D, -0.5).sum(axis=1),
-                                                                                  (n, 1)) * coef
-                grad_LK = -(U0 + U1 + U2)  # * M
-                return grad_LK
-
-            def cal_gy_K(gK_L, Y, Kval):
-                Y = Y.T
-                T = gK_L * (Kval ** 2)
-                C = np.tile(sum(T), (len(Y), 1))
-                g = 4 * (Y @ T - Y * C).T
-                return g
-
-            # print(' ------------Start t_grad ---------------')
-            Kval = squareform(dist)
-            n, d = Y.shape[0], Y.shape[1]
-            D = np.diag(Kval.sum(axis=0))
-            K_ = power_diag(D, -0.5) @ Kval @ power_diag(D, -0.5)
-            L = np.eye(n) - K_
-            # lam, eigenVectors = linalg.eigh(K_, subset_by_index=[n - num_eigen - 1, n - 1])
-            eigenVectors, lam, _ = randomized_svd(K_, n_components=num_eigen, random_state=0)
-            eigenGap = lam[-1] - lam[-2];
-            lam_Kplus1 = lam[-1]
-            eigenGapRatio = eigenGap / lam_Kplus1
-            # print('lam_Kplus1 is', lam_Kplus1)
-            # print('Current eigenGapRatio is ', eigenGapRatio)
-
-            if new_obj == 'gap':
-                eig_V = eigenVectors[:, 1];
-                eig_V_kp1 = eigenVectors[:, 0]
-                inv_trace1 = eigenGap ** (-1) * (eig_V_kp1 @ eig_V_kp1.T - eig_V @ eig_V.T)
-                inv_trace2 = lam_Kplus1 ** (-1) * (eig_V_kp1 @ eig_V_kp1.T)
-                coef = self.beta * (inv_trace1 - inv_trace2)
-            elif new_obj == 'firstK':
-                eig_V = eigenVectors[:, 1:];
-                eig_V_kp1 = eigenVectors[:, 0]
-                lam_first = 1 - lam[1:-1]
-                lam_coef = 1 / lam_first
-                eig_V[:, :-1] = lam_coef ** (1 / 2) * eig_V[:, :-1]
-                if self.P_eigen:
-                    D_P = np.diag(P.sum(axis=0))
-                    K_P = power_diag(D_P, -0.5) @ P @ power_diag(D_P, -0.5)
-                    eigenVectors_P, lam_P, _ = randomized_svd(K_P, n_components=num_eigen, random_state=0)
-                    eig_V_P = eigenVectors_P[:, 1:]
-                    lam_first_P = 1 - lam_P[1:-1]
-                    lam_coef_P = 1 / lam_first_P
-                    eig_V_P[:, :-1] = lam_coef_P ** (1 / 2) * eig_V_P[:, :-1]
-                    coef = self.beta * ((eig_V - eig_V_P) @ (eig_V - eig_V_P).T)
-                else:
-                    coef = self.beta * (eig_V @ eig_V.T)
-            elif new_obj == 'ratio':
-                eig_V = eigenVectors[:, 1:];
-                eig_V_kp1 = eigenVectors[:, 0]
-                inv_trace1 = (self.num_eigen - 1) * sum(lam[1:]) ** (-1) * (eig_V @ eig_V.T)
-                inv_trace2 = lam_Kplus1 ** (-1) * (eig_V_kp1 @ eig_V_kp1.T)
-                coef = self.beta * (inv_trace2 - inv_trace1)
-            else:
-                raise ValueError("'new_obj' must be 'gap', 'ratio' or 'firstK'")
-
-            grad_LK = cal_gk_L(Kval, coef)
-            grad_Y = cal_gy_K(grad_LK, Y, Kval).ravel()
-            lambda_list.append(lam)
-
-            error = self.beta * (num_eigen - sum(lam[1:]))
-
-            return error, grad_Y, lam
-
-        def acc(y_true, y_pred):
-            """
-            Calculate clustering accuracy.
-            # Arguments
-                y: true labels, numpy.array with shape `(n_samples,)`
-                y_pred: predicted labels, numpy.array with shape `(n_samples,)`
-            # Return
-                accuracy, in [0,1]
-            """
-            y_true = y_true.astype(np.int64)
-            assert y_pred.size == y_true.size
-            D = max(y_pred.max(), y_true.max()) + 1
-            w = np.zeros((D, D), dtype=np.int64)
-            for i in range(y_pred.size):
-                w[y_pred[i], y_true[i]] += 1
-            # from sklearn.utils.linear_assignment_ import linear_assignment
-            from scipy.optimize import linear_sum_assignment as linear_assignment
-            ind_row, ind_col = linear_assignment(w.max() - w)
-            return sum([w[i, j] for i, j in zip(ind_row, ind_col)]) * 1.0 / y_pred.size
-
-        def err_rate(gt_s, s):
-            return 1.0 - acc(gt_s, s)
-
-        def thrC(C, alpha):
-            if alpha < 1:
-                N = C.shape[1]
-                Cp = np.zeros((N, N))
-                S = np.abs(np.sort(-np.abs(C), axis=0))
-                Ind = np.argsort(-np.abs(C), axis=0)
-                for i in range(N):
-                    cL1 = np.sum(S[:, i]).astype(float)
-                    stop = False
-                    csum = 0
-                    t = 0
-                    while (stop == False):
-                        csum = csum + S[t, i]
-                        if csum > alpha * cL1:
-                            stop = True
-                            Cp[Ind[0:t + 1, i], i] = C[Ind[0:t + 1, i], i]
-                        t = t + 1
-            else:
-                Cp = C
-
-            return Cp
-
-        def post_proC(C, K, d, ro):
-            # C: coefficient matrix, K: number of clusters, d: dimension of each subspace
-            n = C.shape[0]
-            C = 0.5 * (C + C.T)
-            # C = C - np.diag(np.diag(C)) + np.eye(n, n)  # good for coil20, bad for orl
-            r = d * K + 1
-            U, S, _ = svds(C, r, v0=np.ones(n))
-            U = U[:, ::-1]
-            S = np.sqrt(S[::-1])
-            S = np.diag(S)
-            U = U.dot(S)
-            U = normalize(U, norm='l2', axis=1)
-            Z = U.dot(U.T)
-            Z = Z * (Z > 0)
-            L = np.abs(Z ** ro)
-            L = L / L.max()
-            L = 0.5 * (L + L.T)
-            spectral = cluster.SpectralClustering(n_clusters=K, eigen_solver='arpack', affinity='precomputed',
-                                                  assign_labels='discretize')
-            spectral.fit(L)
-            grp = spectral.fit_predict(L)
-            return grp, L
-
-        def spectral_clustering(C, K, d, alpha, ro):
-            C = thrC(C, alpha)
-            y, _ = post_proC(C, K, d, ro)
-            return y
-
+        """ 
         if args is None:
             args = []
         if kwargs is None:
@@ -2123,41 +1691,31 @@ class TSNE(BaseEstimator):
         error = np.finfo(float).max
         best_error = np.finfo(float).max
         best_iter = i = it
-        lambda_list = []
         tic = time()
 
         for i in tqdm(range(it, n_iter), colour='green'):
             check_convergence = (i + 1) % n_iter_check == 0
             # only compute the error when needed
             kwargs['compute_error'] = check_convergence or i == n_iter - 1
+            error, grad = objective(p, *args, **kwargs)
+
             X_embedded = p.reshape(-1, self.n_components)
-            error, grad, dist = objective(p, *args, **kwargs)
+            if self.kernel == 'Gaussian':
+                error_2, grads, lam = g_grad(X_embedded, self.num_eigen, self.beta, self.new_obj)
+            elif self.kernel == 'Student t':
+                error_2, grads, lam = t_grad(X_embedded, self.num_eigen, self.beta, self.new_obj)
 
-            if (i > self.kl_num):
-                P = squareform(args[0])
-                # print(f'-------- new objective: {self.new_obj} --------')
-                if self.kernel == 'Gaussian':
-                    error_2, grads, lam = gk_grad(X_embedded, self.num_eigen, lambda_list, self.new_obj, P)
-                elif self.kernel == 'Student t':
-                    error_2, grads, lam = t_grad(X_embedded, self.num_eigen, dist, lambda_list, self.new_obj, P)
-                # print(f'gradient: {grads[:2]}, shape: {grads.shape}')
-                self.vis.line(np.array([lam]), np.array([i]), win='Lambda', update='append',
-                              opts=dict(title='Lambda Curve'))
-                # print('-------------- Save eigenvalues -----------------')
-                lam_report = os.path.join(self.output_dir, f'eigenvalue_report.csv')
-                eigen_output = [i, ] + lam
-                with open(lam_report, 'a') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(eigen_output)
+            self.vis.line(np.array([lam]), np.array([i]), win='Lambda', update='append',
+                            opts=dict(title='Lambda Curve'))
+            # print('-------------- Save eigenvalues -----------------')
+            lam_report = os.path.join(self.output_dir, f'eigenvalue_report.csv')
+            eigen_output = [i, ] + lam
+            with open(lam_report, 'a') as f:
+                writer = csv.writer(f)
+                writer.writerow(eigen_output)
 
-                if (i + self.lst_stage >= n_iter) & (n_iter == self.n_iter):
-                    # print('-------------- last stage coef adjusted! -----------------')
-                    grad += self.lastcoef * grads
-                    error += error_2
-                else:
-                    # print('-------------- middle stage coef only beta! -----------------')
-                    grad += grads
-                    error += error_2
+            grad += grads
+            error += error_2
 
             grad_norm = linalg.norm(grad)
             inc = update * grad < 0.0
@@ -2167,27 +1725,19 @@ class TSNE(BaseEstimator):
             np.clip(gains, min_gain, np.inf, out=gains)
             grad *= gains
 
-            if self.opt_method == 'momentum':
-                update = momentum * update - learning_rate * grad
-                p += update
-            elif self.opt_method == 'adam':
-                adam_m = 0.9 * adam_m + (1.0 - 0.9) * grad
-                adam_v = 0.999 * adam_v + (1.0 - 0.999) * grad ** 2
-                mhat = adam_m / (1.0 - 0.9 ** (i + 1))
-                vhat = adam_v / (1.0 - 0.999 ** (i + 1))
-                p -= 0.01 * mhat / (np.sqrt(vhat) + 1e-8)
+            # if self.opt_method == 'momentum':
+            update = momentum * update - learning_rate * grad
+            p += update
+            # elif self.opt_method == 'adam':
+            # adam_m = 0.9 * adam_m + (1.0 - 0.9) * grad
+            # adam_v = 0.999 * adam_v + (1.0 - 0.999) * grad ** 2
+            # mhat = adam_m / (1.0 - 0.9 ** (i + 1))
+            # vhat = adam_v / (1.0 - 0.999 ** (i + 1))
+            # p -= 0.01 * mhat / (np.sqrt(vhat) + 1e-8)
 
             toc = time()
             duration = toc - tic
             tic = toc
-
-            self.vis.line(np.array([duration]), np.array([i]), win='Duration_i', update='append',
-                          opts=dict(title='Time Curve'))
-            time_output = [i, duration]
-            time_report = os.path.join(self.output_dir, f'time_report.csv')
-            with open(time_report, 'a') as f:
-                writer = csv.writer(f)
-                writer.writerow(time_output)
 
             if verbose >= 2:
                 print("[t-SNE] Iteration %d: error = %.7f,"
@@ -2210,37 +1760,22 @@ class TSNE(BaseEstimator):
                           % (i + 1, grad_norm))
                 break
 
-            X_embedded_all = K_coef @ X_embedded
+            ### augmented part: visualize score and error
             if (i % 10 == 0):
-                if (self.proxy is True):
-                    self.vis.scatter(X_embedded_all, self.y + 1,
-                                     opts=dict(markersize=4, title=f'T-SNE (Exact Revised) step{i}'))
-                    self.vis.scatter(X_embedded, None, opts=dict(markersize=4, title=f'T-SNE (Pseudo) step{i}'))
-                    # save .npy
-                    embedding_file = os.path.join(self.output_dir, f'X_embedded/embedding_{i}.npy')
-                    np.save(embedding_file, X_embedded_all)
-                    # save .eps
-                    image_file = os.path.join(self.output_dir, f'X_embedded/image/embedding_{i}.eps')
-                    fig = plt.figure(dpi=1200)
-                    sns.scatterplot(x=X_embedded_all[:, 0], y=X_embedded_all[:, 1], c=self.y + 1)
-                    plt.title(f'T-SNE with proxy at step {i}')
-                    fig.savefig(image_file, format='eps', dpi=1200)
-                else:
-                    self.vis.scatter(X_embedded, self.y + 1,
-                                     opts=dict(markersize=4, title=f'T-SNE (Exact Revised) step{i}'))
-                    # save .npy
-                    embedding_file = os.path.join(self.output_dir, f'X_embedded/embedding_{i}.npy')
-                    np.save(embedding_file, X_embedded)
-                    # save .eps
-                    image_file = os.path.join(self.output_dir, f'X_embedded/image/embedding_{i}.eps')
-                    fig = plt.figure(dpi=1200)
-                    sns.scatterplot(x=X_embedded[:, 0], y=X_embedded[:, 1], c=self.y + 1)
-                    plt.title(f'T-SNE at step {i}')
-                    fig.savefig(image_file, format='eps', dpi=1200)
+                self.vis.scatter(X_embedded, self.y + 1,
+                                    opts=dict(markersize=4, title=f'T-SNE (Exact Revised) step{i}'))
+                # save .npy
+                embedding_file = os.path.join(self.output_dir, f'X_embedded/embedding_{i}.npy')
+                np.save(embedding_file, X_embedded)
+                # save .eps
+                image_file = os.path.join(self.output_dir, f'X_embedded/image/embedding_{i}.eps')
+                fig = plt.figure(dpi=1200)
+                sns.scatterplot(x=X_embedded[:, 0], y=X_embedded[:, 1], c=self.y + 1)
+                plt.title(f'T-SNE at step {i}')
+                fig.savefig(image_file, format='eps', dpi=1200)
 
             if (i % 20 == 0) | (i + 1 >= self.n_iter):
                 # KNN score
-                # print('--------Calculate K-NN Score-------')
                 score_list = []
                 if self.knn_type == 'small':
                     neighbors = [10, 20, 40, 80, 160]
@@ -2249,42 +1784,44 @@ class TSNE(BaseEstimator):
                 for n_neighbor in neighbors:
                     neigh = KNeighborsClassifier(n_neighbors=n_neighbor)
 
-                    neigh.fit(X_embedded_all, self.y.ravel())
+                    neigh.fit(X_embedded, self.y.ravel())
                     score_list.append(neigh.score(X_embedded, self.y.ravel()))
                 knn_report = [i, ] + score_list
-                '''
-                example:
-                10, 0.9123, 0.8923, 0.8452, 0.8213
-                20, 0.9321, 0.9023, 0.8762, 0.8533
-                '''
                 output_report = os.path.join(self.output_dir, f'knn_report.csv')
                 with open(output_report, 'a') as f:
                     writer = csv.writer(f)
                     writer.writerow(knn_report)
 
                 # print('--------Calculate K-Means Score-------')
-                score = 0
-                for t in range(5):
-                    y_pred = KMeans(n_clusters=self.num_eigen, random_state=t).fit_predict(X_embedded)
-                    score += acc(self.y.ravel(), y_pred)
-                score = score / 5
-                kMeans_report = [i, score]
-                output2_report = os.path.join(self.output_dir, f'kMeans_report.csv')
-                with open(output2_report, 'a') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(kMeans_report)
+                # score = 0
+                # from ..cluster import KMeans
+                # for t in range(5):
+                #     y_pred = KMeans(n_clusters=self.num_eigen, random_state=t, n_init='auto').fit_predict(X_embedded)
+                #     score += acc(self.y.ravel(), y_pred)
+                # score = score / 5
+                # kMeans_report = [i, score]
+                # output2_report = os.path.join(self.output_dir, f'kMeans_report.csv')
+                # with open(output2_report, 'a') as f:
+                #     writer = csv.writer(f)
+                #     writer.writerow(kMeans_report)
 
                 self.vis.line(np.array([score_list]), np.array([i]), win='KNN-Score', update='append',
                               opts=dict(title='Score Curve'))
                 self.vis.line(np.array([error]), np.array([i]), win='Objective value', update='append',
                               opts=dict(title='Objective value'))
-
-                # print(f'K-NN Score at {i} is {dict(zip(neighbors,score_list))}')
+            
+            self.vis.line(np.array([duration]), np.array([i]), win='Duration_i', update='append',
+                          opts=dict(title='Time Curve'))
+            time_output = [i, duration]
+            time_report = os.path.join(self.output_dir, f'time_report.csv')
+            with open(time_report, 'a') as f:
+                writer = csv.writer(f)
+                writer.writerow(time_output)
 
         return p, error, i
 
+
     def _fit(self, X, skip_num_points=0):
-        global K_coef
         """Private function to fit the model using X as training data."""
 
         if self.method not in ['barnes_hut', 'exact']:
@@ -2342,49 +1879,50 @@ class TSNE(BaseEstimator):
 
         n_samples = X.shape[0]
 
-        if self.proxy is True:
-            print(f'======= X shape is {X.shape} ==========')
-            n_component = X.shape[1] // 20
-            pca = PCA(n_components=n_component, svd_solver='randomized', random_state=random_state)
-            X_low = pca.fit_transform(X).astype(np.float64, copy=False)
-            print(f'==== Finish PCA with X_low ({X_low.shape})=====')
-            X = KMeans(n_clusters=self.num_proxies, random_state=0, init='k-means++').fit(
-                X_low).cluster_centers_  # (2000, X.shape[1]//10)
-            print('X is \n', X)
-            print('==== Finish KMeans =====')
+        # if self.proxy is True:
+        #     from ..cluster import KMeans
+        #     print(f'======= X shape is {X.shape} ==========')
+        #     n_component = X.shape[1] // 20
+        #     pca = PCA(n_components=n_component, svd_solver='randomized', random_state=random_state)
+        #     X_low = pca.fit_transform(X).astype(np.float64, copy=False)
+        #     print(f'==== Finish PCA with X_low ({X_low.shape})=====')
+        #     X = KMeans(n_clusters=self.num_proxies, random_state=0, init='k-means++').fit(
+        #         X_low).cluster_centers_  # (2000, X.shape[1]//10)
+        #     print('X is \n', X)
+        #     print('==== Finish KMeans =====')
 
-            def Epan_kernel(X_low, X):
-                X_diff = pairwise_distances(X_low, X,
-                                            metric='l1')  # (70,000, X.shape[1]//10) - (2,000, X.shape[1]//10) -> (70,000, 2,000)
-                print('X_diff 1 is \n', X_diff[0])
-                ker_lambda = np.mean(X_diff, axis=1) * 1
-                t = X_diff / np.tile(ker_lambda, (X_diff.shape[1], 1)).T
-                t[t > 1] = 1
-                print('t matrix has zero values:', (t == 0).sum())
-                print('t 1 is \n', t[0])
-                K_lam = 3 / 4 * (1 - t ** 2)
-                K_coef = K_lam / np.tile(np.sum(K_lam, axis=1), (K_lam.shape[1], 1)).T
-                return K_coef
+        #     def Epan_kernel(X_low, X):
+        #         X_diff = pairwise_distances(X_low, X,
+        #                                     metric='l1')  # (70,000, X.shape[1]//10) - (2,000, X.shape[1]//10) -> (70,000, 2,000)
+        #         print('X_diff 1 is \n', X_diff[0])
+        #         ker_lambda = np.mean(X_diff, axis=1) * 1
+        #         t = X_diff / np.tile(ker_lambda, (X_diff.shape[1], 1)).T
+        #         t[t > 1] = 1
+        #         print('t matrix has zero values:', (t == 0).sum())
+        #         print('t 1 is \n', t[0])
+        #         K_lam = 3 / 4 * (1 - t ** 2)
+        #         K_coef = K_lam / np.tile(np.sum(K_lam, axis=1), (K_lam.shape[1], 1)).T
+        #         return K_coef
 
-            def tricube_kernel(X_low, X):
-                X_diff = pairwise_distances(X_low, X,
-                                            metric='l1')  # (70,000, X.shape[1]//10) - (2,000, X.shape[1]//10) -> (70,000, 2,000)
-                print('X_diff 1 is \n', X_diff[0])
-                ker_lambda = np.mean(X_diff, axis=1) * 1
-                t = X_diff / np.tile(ker_lambda, (X_diff.shape[1], 1)).T
-                t[t > 1] = 1
-                print('t matrix has zero values:', (t == 0).sum())
-                print('t 1 is \n', t[0])
-                K_lam = (1 - t ** 3) ** 3
-                K_coef = K_lam / np.tile(np.sum(K_lam, axis=1), (K_lam.shape[1], 1)).T
-                return K_coef
+        #     def tricube_kernel(X_low, X):
+        #         X_diff = pairwise_distances(X_low, X,
+        #                                     metric='l1')  # (70,000, X.shape[1]//10) - (2,000, X.shape[1]//10) -> (70,000, 2,000)
+        #         print('X_diff 1 is \n', X_diff[0])
+        #         ker_lambda = np.mean(X_diff, axis=1) * 1
+        #         t = X_diff / np.tile(ker_lambda, (X_diff.shape[1], 1)).T
+        #         t[t > 1] = 1
+        #         print('t matrix has zero values:', (t == 0).sum())
+        #         print('t 1 is \n', t[0])
+        #         K_lam = (1 - t ** 3) ** 3
+        #         K_coef = K_lam / np.tile(np.sum(K_lam, axis=1), (K_lam.shape[1], 1)).T
+        #         return K_coef
 
-            # K_coef = Epan_kernel(X_low, X)
-            K_coef = tricube_kernel(X_low, X)
-            print(f'K_coef matrix has shape {K_coef.shape}')
-            print('K_coef 1 is \n', K_coef[0])
-        else:
-            K_coef = np.eye(n_samples)
+        #     # K_coef = Epan_kernel(X_low, X)
+        #     K_coef = tricube_kernel(X_low, X)
+        #     print(f'K_coef matrix has shape {K_coef.shape}')
+        #     print('K_coef 1 is \n', K_coef[0])
+        # else:
+        #     K_coef = np.eye(n_samples)
 
         neighbors_nn = None
         if self.method == "exact":
@@ -2507,7 +2045,6 @@ class TSNE(BaseEstimator):
 
     def _tsne(self, P, degrees_of_freedom, n_samples, X_embedded, X,
               neighbors=None, skip_num_points=0):
-        global adam_m, adam_v
         """Runs t-SNE."""
         # t-SNE minimizes the Kullback-Leiber divergence of the Gaussians P
         # and the Student's t-distributions Q. The optimization algorithm that
@@ -2543,7 +2080,6 @@ class TSNE(BaseEstimator):
         # higher learning rate controlled via the early exaggeration parameter
 
         P *= self.early_exaggeration
-        adam_m = adam_v = np.zeros(len(params))
         params, kl_divergence, it = self._gradient_descent(obj_func, params, X=X,
                                                            **opt_args)
         if self.verbose:
