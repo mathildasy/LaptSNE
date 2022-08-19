@@ -1,42 +1,30 @@
-
-# print('begin')
-# from sklearn.manifold import TSNE
-# print('import sklearn.manifold')
-# # from tsne_torch import TorchTSNE as torchTSNE
-# # print('tsne_torch import TorchTSNE')
-# import os
-# from time import time
-# from visdom import Visdom
-
-# # import external library
-# # import torch
-# # import numpy as np
-# # from scipy.spatial.distance import squareform
-
-# # import local pakages
-# # from sklearn.manifold import TSNE
-# # from sklearn.decomposition import PCA
-# # from tsne_torch import TorchTSNE as torchTSNE
+import numpy as np
 # import load_data
-# # from sklearn import datasets
-# # import numpy as np
-# # import scipy.io
-# print('import load_data')
 
-# import py_compile
-# py_compile.compile('load_data.py')
-# print('import load_data')
+# @attribute class {Agresti,Ashbacher,Auken,Blankenship,Brody,Brown,Bukowsky,CFH,Calvinnme,Chachra,Chandler,Chell,Cholette,Comdet,Corn,Cutey,Davisson,Dent,Engineer,Goonan,Grove,Harp,Hayes,Janson,Johnson,Koenig,Kolln,Lawyeraau,Lee,Lovitt,Mahlers2nd,Mark,McKee,Merritt,Messick,Mitchell,Morrison,Neal,Nigam,Peterson,Power,Riley,Robert,Shea,Sherwin,Taylor,Vernon,Vision,Walters,Wilson}
 
-# from load_data import digits
+# # X, y = load_data.EEG(-1,0)
+# X = np.load('./data/WAV.npy')
+# y = X[:,-1]
+# X = X[:,:-1]
 
-# print('import load_data')
+# print(X.shape, y.shape)
+# print(np.unique(y))
 
-# import visdom
-# import numpy as np
-# vis = visdom.Visdom()
-# vis.text('Hello, world!')
-# vis.image(np.ones((3, 10, 10)))
+# np.save('./data/WAV_X.npy', X)
+# np.save('./data/WAV_Y.npy', y)
 
+# from scipy.io import arff
+# import pandas as pd
 
+# data = arff.loadarff('./data/Amazon_initial_50_30_10000.arff')
+# df = pd.DataFrame(data[0])
 
+# np.save('./data/Amazon.npy', data)
 
+# X = np.loadtxt('./data/arcene_train.data')
+# print(X, X.shape)
+# np.save('./data/ARCENE_X.npy', X)
+# y = np.loadtxt('./data/arcene_train.labels')
+# print(y, y.shape)
+# np.save('./data/ARCENE_Y.npy', y)

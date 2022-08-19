@@ -88,6 +88,49 @@ def COIL20(num_samples=-1, seed=0):
     # y = np.array([int(i) for i in y])
     return X, y
 
+def HAR(num_samples=-1, seed=0):
+    X, y = np.load(PATH + 'HAR_X.npy'), np.load(PATH + 'HAR_Y.npy')
+    if num_samples >= 0:
+        np.random.seed(seed)
+        select = np.random.choice(np.arange(X.shape[0]), size=num_samples)
+        X = X[select]
+        y = y[select]
+
+    if num_samples < 0: num_samples = X.shape[0]
+    print(f'--------Finish loading HAR dataset [size: {num_samples}, shape: {X.shape}]--------')
+    # y = np.array([int(i) for i in y])
+    return X, y
+
+def EEG(num_samples=-1, seed=0):
+    X, y = np.load(PATH + 'EEG_X.npy'), np.load(PATH + 'EEG_Y.npy')
+    n = X.shape[0]
+    X = X.reshape(n,-1)
+    if num_samples >= 0:
+        np.random.seed(seed)
+        select = np.random.choice(np.arange(X.shape[0]), size=num_samples)
+        X = X[select]
+        y = y[select]
+
+    if num_samples < 0: num_samples = X.shape[0]
+    print(f'--------Finish loading EEG dataset [size: {num_samples}, shape: {X.shape}]--------')
+    # y = np.array([int(i) for i in y])
+    return X, y
+
+
+def WAV(num_samples=-1, seed=0):
+    X, y = np.load(PATH + 'WAV_X.npy'), np.load(PATH + 'WAV_Y.npy')
+    n = X.shape[0]
+    X = X.reshape(n,-1)
+    if num_samples >= 0:
+        np.random.seed(seed)
+        select = np.random.choice(np.arange(X.shape[0]), size=num_samples)
+        X = X[select]
+        y = y[select]
+
+    if num_samples < 0: num_samples = X.shape[0]
+    print(f'--------Finish loading WAV dataset [size: {num_samples}, shape: {X.shape}]--------')
+    # y = np.array([int(i) for i in y])
+    return X, y
 
 # def COIL100(num_samples=-1, seed=0):
 #     data = scipy.io.loadmat(PATH + 'COIL100.mat')
