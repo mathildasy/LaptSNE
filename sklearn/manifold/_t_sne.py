@@ -590,7 +590,13 @@ class TSNE(BaseEstimator):
 
             X_embedded = p.reshape(-1, self.n_components)
 
-        
+            ## just test whether relationship between non-neighbors are close to zero
+            def get_Q_tStudent(eucdis, degrees_of_freedom):
+                eucdis /= degrees_of_freedom
+                eucdis += 1.
+                Q = np.power(eucdis, (degrees_of_freedom + 1.0) / -2.0)
+                return Q
+
             if i % 10 == 0:
                 pbar.set_description('Processing %s samples'%(len(X_embedded)))
                 grads, eig_V = objective_2(X_embedded, self.num_eigen, 
@@ -606,6 +612,10 @@ class TSNE(BaseEstimator):
                 K_index = np.argwhere(np.sum(A_list, axis=0) != 0).ravel() # relevant Nk samples 
                 X_embedded2 = X_embedded[K_index]
                 eig_V2 = eig_V[K_index]
+                eucdis_1 = pdist(X_embedded, 'sqeuclidean')
+                Q_1 = get_Q_tStudent(eucdis_1, degrees_of_freedom = 2)
+                print('########### the Q except for nearest neighbors ########')
+                print(Q_1[-K_index, -K_index])
                 pbar.set_description('Processing %s samples'%(len(K_index)))
                 grads2, eig_V2 = objective_2(X_embedded2, self.num_eigen, 
                                                         self.beta, self.new_obj, 
