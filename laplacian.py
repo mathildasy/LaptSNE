@@ -78,11 +78,20 @@ def cal_gq_Q(Q, coef):
 
     n = Q.shape[0]
     D_diag = Q.sum(axis=0)  # column sum
-    D_05 = np.diag(np.power(D_diag, -0.5))
-    D_15 = np.diag(np.power(D_diag, -1.5))
+    # D_05 = np.diag(np.power(D_diag, -0.5))
+    # D_15 = np.diag(np.power(D_diag, -1.5))
+    D_05 = np.power(D_diag, -0.5)
+    D_15 = np.power(D_diag, -1.5)
     D_05_tile = np.tile(D_05.sum(axis=0), (n, 1))
+<<<<<<< HEAD
     U0 = -0.5 * np.multiply(np.matmul(np.matmul(D_15, Q), D_05), coef)
     U1 = -0.5 * np.multiply(np.matmul(np.matmul(D_05, Q), D_15), coef)
+=======
+    # U0 = -0.5 * np.matmul(np.matmul(D_15, Q), D_05) * coef
+    # U1 = -0.5 * np.matmul(np.matmul(D_05, Q), D_15) * coef
+    U0 = -0.5 * np.tile(D_15,(n,1)).T * Q * np.tile(D_05,(n,1)) * coef
+    U1 = -0.5 * np.tile(D_05,(n,1)).T * Q * np.tile(D_15,(n,1)) * coef    ## change matrix multiplication to dot multiplication
+>>>>>>> 65499cee6f560c8db9f2aa933a14c86c8107518a
     U0 = np.tile(U0.sum(axis=0), (n, 1)).T
     U1 = np.tile(U1.sum(axis=1), (n, 1))
     U2 = np.multiply(np.multiply(D_05_tile.T, D_05_tile), coef)
@@ -140,7 +149,8 @@ def t_grad(Y, num_eigen, beta, new_obj = 'firstK', degrees_of_freedom=2, skip_de
     eucdis = pdist(Y, 'sqeuclidean')
     Q = get_Q_tStudent(eucdis, degrees_of_freedom)
     Q = squareform(Q)
-
+    print('###### the actual Q ######')
+    print(Q)
     if not skip_decompose: 
         D_diag = Q.sum(axis=0)
         D_05 = np.diag(np.power(D_diag, -0.5))
