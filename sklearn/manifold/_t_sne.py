@@ -29,7 +29,7 @@ from ..utils.validation import check_non_negative
 from ..utils._param_validation import Interval, StrOptions, Hidden
 from ..decomposition import PCA
 from ..metrics.pairwise import pairwise_distances, _VALID_METRICS
-from laplacian import g_grad, t_grad, power_diag
+from laplacian import g_grad, t_grad, power_diag, get_Q_tStudent
 import dask.array as da
 
 # mypy error: Module 'sklearn.manifold' has no attribute '_utils'
@@ -587,7 +587,6 @@ class TSNE(BaseEstimator):
             kwargs['compute_error'] = check_convergence or i == n_iter - 1
             error, grad = objective(p, *args, **kwargs)
 
-<<<<<<< HEAD
             if self.num_neighbors != 'tsne': 
                 X_embedded = p.reshape(-1, self.n_components)
                 if i % 10 == 0:
@@ -603,47 +602,19 @@ class TSNE(BaseEstimator):
                     K_index = np.argwhere(np.sum(A_list, axis=0) != 0).ravel() # relevant Nk samples 
                     X_embedded2 = X_embedded[K_index]
                     eig_V2 = eig_V[K_index]
+                    eucdis_1 = pdist(X_embedded, 'sqeuclidean')
+                    Q_1 = get_Q_tStudent(eucdis_1, degrees_of_freedom = 2)
+                    print('########### the Q except for nearest neighbors ########')
+                    print(Q_1[-K_index, -K_index])
                     pbar.set_description('Processing %s samples'%(len(K_index)))
                     grads2, eig_V2 = objective_2(X_embedded2, self.num_eigen, 
                                                             self.beta, self.new_obj, 
                                                             skip_decompose=True, 
                                                             eig_V=eig_V2)
-                    grads[K_index] += grads2
+                    grads[K_index] = grads2
                 else:
                     pbar.set_description('Processing %s samples'%(len(X_embedded)))
                     grads, eig_V = objective_2(X_embedded, self.num_eigen, 
-=======
-            X_embedded = p.reshape(-1, self.n_components)
-
-            ## just test whether relationship between non-neighbors are close to zero
-            def get_Q_tStudent(eucdis, degrees_of_freedom):
-                eucdis /= degrees_of_freedom
-                eucdis += 1.
-                Q = np.power(eucdis, (degrees_of_freedom + 1.0) / -2.0)
-                return Q
-
-            if i % 10 == 0:
-                pbar.set_description('Processing %s samples'%(len(X_embedded)))
-                grads, eig_V = objective_2(X_embedded, self.num_eigen, 
-                                                        self.beta, self.new_obj, 
-                                                        skip_decompose=False)
-                
-            
-            elif self.mini_batch:
-                grads = np.zeros_like(X_embedded)
-                #TODO: for mini-batched method, how to randomly select?
-                selected_sample = np.random.choice(np.arange(len(X_embedded)), size=self.batch_size, replace=False)
-                A_list = A[selected_sample]
-                K_index = np.argwhere(np.sum(A_list, axis=0) != 0).ravel() # relevant Nk samples 
-                X_embedded2 = X_embedded[K_index]
-                eig_V2 = eig_V[K_index]
-                eucdis_1 = pdist(X_embedded, 'sqeuclidean')
-                Q_1 = get_Q_tStudent(eucdis_1, degrees_of_freedom = 2)
-                print('########### the Q except for nearest neighbors ########')
-                print(Q_1[-K_index, -K_index])
-                pbar.set_description('Processing %s samples'%(len(K_index)))
-                grads2, eig_V2 = objective_2(X_embedded2, self.num_eigen, 
->>>>>>> 65499cee6f560c8db9f2aa933a14c86c8107518a
                                                         self.beta, self.new_obj, 
                                                         skip_decompose=True, 
                                                         eig_V = eig_V)
