@@ -6,21 +6,22 @@ from sklearn.preprocessing import normalize
 from sklearn.neighbors import kneighbors_graph
 from sklearn.cluster import SpectralClustering
 from numba import jit
+import dask.array as da
 
 
-@jit(fastmath=True, parallel=True)
+# @jit(fastmath=True, parallel=True)
 def power_diag(D, power):
     D_new = np.diag(np.power(np.diag(D), power))
     return D_new
 
-@jit(fastmath=True, parallel=True)
+# @jit(fastmath=True, parallel=True)
 def get_Q_gaussian(eucdis, sigman):
     K = np.exp(-0.5 * eucdis / sigman)
     K = K - np.eye(eucdis.shape[0])  # turn the similarity matrix into affinity matrix
     Q = 0.5 * (K + K.T)
     return Q
 
-@jit(fastmath=True, parallel=True)
+# @jit(fastmath=True, parallel=True)
 def get_Q_tStudent(eucdis, degrees_of_freedom):
     eucdis /= degrees_of_freedom
     eucdis += 1.
@@ -28,7 +29,7 @@ def get_Q_tStudent(eucdis, degrees_of_freedom):
     return Q
 
 
-@jit(fastmath=True, parallel=True)
+# @jit(fastmath=True, parallel=True)
 def cal_coef_first(eigenVectors, lam, new_obj, num_eigen):
     eig_V = eigenVectors[:, 1:]
     lam_first = (1 - lam[1:])[::-1]
@@ -80,12 +81,12 @@ def cal_gq_Q(Q, coef):
     D_05 = np.diag(np.power(D_diag, -0.5))
     D_15 = np.diag(np.power(D_diag, -1.5))
     D_05_tile = np.tile(D_05.sum(axis=0), (n, 1))
-    U0 = -0.5 * np.matmul(np.matmul(D_15, Q), D_05) * coef
-    U1 = -0.5 * np.matmul(np.matmul(D_05, Q), D_15) * coef
+    U0 = -0.5 * np.multiply(np.matmul(np.matmul(D_15, Q), D_05), coef)
+    U1 = -0.5 * np.multiply(np.matmul(np.matmul(D_05, Q), D_15), coef)
     U0 = np.tile(U0.sum(axis=0), (n, 1)).T
     U1 = np.tile(U1.sum(axis=1), (n, 1))
-    U2 = D_05_tile.T * D_05_tile * coef
-    grad_Q = -(U0 + U1 + U2)
+    U2 = np.multiply(np.multiply(D_05_tile.T, D_05_tile), coef)
+    grad_Q = (-1) * (U0 + U1 + U2)
     return grad_Q
 
 
@@ -144,13 +145,16 @@ def t_grad(Y, num_eigen, beta, new_obj = 'firstK', degrees_of_freedom=2, skip_de
         D_diag = Q.sum(axis=0)
         D_05 = np.diag(np.power(D_diag, -0.5))
         L = np.matmul(np.matmul(D_05, Q), D_05)
-        eigenVectors, lam, _ = sklearn.utils.extmath.randomized_svd(L, n_components=num_eigen, random_state=0)
-        # coef = cal_coef(eigenVectors, lam, new_obj, num_eigen)
+        L_da = da.from_array(L, asarray=True)
+        eigenVectors, lam, _ = da.linalg.svd_compressed(L_da, k=num_eigen, compute=True)
+        lam = lam.compute()
+        eigenVectors = eigenVectors.compute()
+        # eigenVectors, lam, _ = sklearn.utils.extmath.randomized_svd(L, n_components=num_eigen, random_state=0)
         eig_V = cal_coef_first(eigenVectors, lam, new_obj, num_eigen)
-    
+
+        
     coef = np.matmul(eig_V, eig_V.T)
     coef *= beta
-    
     grad_Q = cal_gq_Q(Q, coef)
     grad_Y = cal_gy_Q_tStudent(grad_Q, Y, Q)
 

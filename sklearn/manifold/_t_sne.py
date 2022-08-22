@@ -30,7 +30,7 @@ from ..utils._param_validation import Interval, StrOptions, Hidden
 from ..decomposition import PCA
 from ..metrics.pairwise import pairwise_distances, _VALID_METRICS
 from laplacian import g_grad, t_grad, power_diag
-
+import dask.array as da
 
 # mypy error: Module 'sklearn.manifold' has no attribute '_utils'
 from . import _utils  # type: ignore
@@ -573,9 +573,8 @@ class TSNE(BaseEstimator):
         best_error = np.finfo(float).max
         best_iter = i = it
 
-        if self.mini_batch:
+        if self.mini_batch & (self.num_neighbors != 'tsne'):
             P = squareform(args[0]) # (n_samples, n_samples)
-            print(P.shape)
             P_dis = 1 - P
             neigh = NearestNeighbors(n_neighbors=self.num_neighbors, metric='precomputed').fit(P_dis)
             A = neigh.kneighbors_graph(P_dis).toarray()
@@ -588,40 +587,36 @@ class TSNE(BaseEstimator):
             kwargs['compute_error'] = check_convergence or i == n_iter - 1
             error, grad = objective(p, *args, **kwargs)
 
-            X_embedded = p.reshape(-1, self.n_components)
-
-        
-            if i % 10 == 0:
-                pbar.set_description('Processing %s samples'%(len(X_embedded)))
-                grads, eig_V = objective_2(X_embedded, self.num_eigen, 
-                                                        self.beta, self.new_obj, 
-                                                        skip_decompose=False)
-                
-            
-            elif self.mini_batch:
-                grads = np.zeros_like(X_embedded)
-                #TODO: for mini-batched method, how to randomly select?
-                selected_sample = np.random.choice(np.arange(len(X_embedded)), size=self.batch_size, replace=False)
-                A_list = A[selected_sample]
-                K_index = np.argwhere(np.sum(A_list, axis=0) != 0).ravel() # relevant Nk samples 
-                X_embedded2 = X_embedded[K_index]
-                eig_V2 = eig_V[K_index]
-                pbar.set_description('Processing %s samples'%(len(K_index)))
-                grads2, eig_V2 = objective_2(X_embedded2, self.num_eigen, 
+            if self.num_neighbors != 'tsne': 
+                X_embedded = p.reshape(-1, self.n_components)
+                if i % 10 == 0:
+                    pbar.set_description('Processing %s samples'%(len(X_embedded)))
+                    grads, eig_V = objective_2(X_embedded, self.num_eigen, 
+                                                            self.beta, self.new_obj, 
+                                                            skip_decompose=False)
+                elif self.mini_batch:
+                    grads = np.zeros_like(X_embedded)
+                    #TODO: for mini-batched method, how to randomly select?
+                    selected_sample = np.random.choice(np.arange(len(X_embedded)), size=self.batch_size, replace=False)
+                    A_list = A[selected_sample]
+                    K_index = np.argwhere(np.sum(A_list, axis=0) != 0).ravel() # relevant Nk samples 
+                    X_embedded2 = X_embedded[K_index]
+                    eig_V2 = eig_V[K_index]
+                    pbar.set_description('Processing %s samples'%(len(K_index)))
+                    grads2, eig_V2 = objective_2(X_embedded2, self.num_eigen, 
+                                                            self.beta, self.new_obj, 
+                                                            skip_decompose=True, 
+                                                            eig_V=eig_V2)
+                    grads[K_index] += grads2
+                else:
+                    pbar.set_description('Processing %s samples'%(len(X_embedded)))
+                    grads, eig_V = objective_2(X_embedded, self.num_eigen, 
                                                         self.beta, self.new_obj, 
                                                         skip_decompose=True, 
-                                                        eig_V=eig_V2)
-                grads[K_index] += grads2
-            else:
-                pbar.set_description('Processing %s samples'%(len(X_embedded)))
-                grads, eig_V = objective_2(X_embedded, self.num_eigen, 
-                                                    self.beta, self.new_obj, 
-                                                    skip_decompose=True, 
-                                                    eig_V = eig_V)
-                
+                                                        eig_V = eig_V)
 
-            grads = grads.ravel()
-            grad += grads
+                grads = grads.ravel()
+                grad += grads
 
             grad_norm = linalg.norm(grad)
             inc = update * grad < 0.0
@@ -850,10 +845,17 @@ class TSNE(BaseEstimator):
             X_embedded = 1e-4 * random_state.randn(
                 n_samples, self.n_components).astype(np.float32)
         elif self.init == 'spectral':
-            # FIXME: added
-            D = np.diag(squareform(P).sum(axis=1))
-            _, X_embedded = linalg.eigh(np.eye(D.shape[0]) - power_diag(D, -0.5) @ squareform(P) @ power_diag(D, -0.5),
-                                        subset_by_index=[1, self.n_components])
+            # FIXME: optimize speed
+            # D = np.diag(squareform(P).sum(axis=1))
+            # _, X_embedded = linalg.eigh(np.eye(D.shape[0]) - power_diag(D, -0.5) @ squareform(P) @ power_diag(D, -0.5),
+            #                             subset_by_index=[1, self.n_components])
+
+            D_diag = squareform(P).sum(axis=0)
+            D_05 = np.diag(np.power(D_diag, -0.5))
+            L = np.matmul(np.matmul(D_05, squareform(P)), D_05)
+            L_da = da.from_array(L, asarray=True)
+            X_embedded, _, _ = da.linalg.svd_compressed(L_da, k=self.n_components, compute=True)
+            X_embedded = X_embedded.compute()
             # X_embedded, _, _ = randomized_svd(power_diag(D, -0.5) @ squareform(P) @ power_diag(D, -0.5), n_components = self.n_components, random_state= 0)
 
         else:

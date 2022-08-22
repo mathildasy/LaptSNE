@@ -6,4 +6,23 @@ We evaluate our method by a formal comparison with state-of-the-art methods, bot
 
 ## How to use
 
+## Install dependencies
+
+Python packages: `numba` and `dask` to accelerate computation, and `visdom` to visualize result of the scatterplot and assessment metrics.
+
+```shell
+pip install -r requirements.txt
+```
+## Run
+
+Before running LaptSNE, please initalize `visdom` in your terminal by command:
+
+```shell
+visdom
+```
+
 There are two implementation of LaptSNE. First, we implement the LaptSNE based on the scikit-learn package. Another extended version was tsne-torch, which support GPU-acceleration. You can test the code by runing `test-TSNE.py` for the sklearn version and running `test-torch.py` for the tsne-torch version. Data are available in the folder `./data`, where COIL20 dataset is provided.
+
+
+
+

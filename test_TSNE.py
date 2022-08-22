@@ -9,19 +9,21 @@ import numpy as np
 from auto_perplexity import opt_numEigen
 from sklearn.manifold import TSNE
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn import metrics
+from sklearn.cluster import KMeans
 from visdom import Visdom
 
-def append_log(vis,info):
-    log_win = vis.text('', opts=dict(title='log'))
-    localtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    line = "<b>[{0}] \n </b>: {1}".format(localtime, info)
-    vis.text(line, win=log_win, append=True)
+# def append_log(vis,info):
+#     log_win = vis.text('', opts=dict(title='log'))
+#     localtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+#     line = "<b>[{0}] \n </b>: {1}".format(localtime, info)
+#     vis.text(line, win=log_win, append=True)
 
 
 def laplacian_TSNE(beta, batch_size, num_neighbors, opt_perplexity = 25, dataname = 'COIL100', n_components = 2, num_eigen = 10, proxy = False):
 
     NUM_ITERS = 100
-    NUM_SAMPLES = 3000
+    NUM_SAMPLES = 5000
     LEARNING_RATE = 1e2 # update Y
     BETA = beta
 
@@ -108,13 +110,19 @@ def laplacian_TSNE(beta, batch_size, num_neighbors, opt_perplexity = 25, datanam
     X_embedded = K_coef @ X_embedded
 
     score_list = []
-    neighbors = [10, 20, 40, 80, 160]
+    neighbors = [10, 20, 40, 80]
     for n_neighbor in neighbors:
         neigh = KNeighborsClassifier(n_neighbors=n_neighbor)
         neigh.fit(X_embedded, y.ravel())
         score_list.append(np.round(neigh.score(X_embedded, y.ravel()), 3))
-
     vis.scatter(X_embedded, y + 1, opts=dict(markersize=4, title=f'{batch_size}-{num_neighbors}:{score_list}'))
+    
+    kmeans_model = KMeans(n_clusters=num_eigen, n_init='auto').fit(X)
+    labels = kmeans_model.labels_
+    silhouette = metrics.silhouette_score(X,labels)
+    calinski = metrics.calinski_harabasz_score(X, labels) # the higher the score the more well defined the clusters are.
+    davies = metrics.davies_bouldin_score(X, labels) # this score measures the similarity of your clusters, meaning that the lower the score the better separation there is between your clusters.
+    vis.text(f'{batch_size}-{num_neighbors} | silhouette: {silhouette}; calinski: {calinski}; davies: {davies}')
     vis.save([ENV])
 
     print('-----end-----')
@@ -127,5 +135,5 @@ if __name__ == '__main__':
     proxy=False
     batch_size = -1
     num_eigen = 10 # HAR: 28; EEG: 10; WAV: 19
-    num_neighbors = 'all'
+    num_neighbors = 'tsne'
     laplacian_TSNE(beta, batch_size, num_neighbors, opt_perplexity, dataname = dataname, n_components = 2, num_eigen = num_eigen, proxy = proxy)
